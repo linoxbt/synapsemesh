@@ -280,7 +280,8 @@ export function useMesh<T>(selector: (s: State) => T): T {
   useEffect(() => {
     const update = () => setVal(selector(state));
     update();
-    return mesh.subscribe(update);
+    const unsub = mesh.subscribe(update);
+    return () => { unsub(); };
   }, [selector]);
   return val;
 }
