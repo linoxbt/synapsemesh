@@ -1,71 +1,67 @@
+import { useMesh } from "@/lib/sdk";
+import { Link } from "@tanstack/react-router";
+import { DAGGraph } from "./DAGGraph";
+
+const SAMPLE = {
+  nodes: [
+    { id: "a", label: "Research", type: "SEQUENTIAL" as const, budget: 2, deps: [], status: "Settled" as const, agentName: "claude-r1" },
+    { id: "b1", label: "Draft A", type: "PARALLEL" as const, budget: 1.5, deps: ["a"], status: "Executing" as const, agentName: "gpt-w2" },
+    { id: "b2", label: "Draft B", type: "PARALLEL" as const, budget: 1.5, deps: ["a"], status: "Executing" as const, agentName: "llama-w7" },
+    { id: "c", label: "Merge", type: "REDUCE" as const, budget: 1, deps: ["b1", "b2"], status: "Bidding" as const },
+    { id: "d", label: "Verify", type: "SEQUENTIAL" as const, budget: 0.5, deps: ["c"], status: "Pending" as const },
+  ],
+  edges: [["a", "b1"], ["a", "b2"], ["b1", "c"], ["b2", "c"], ["c", "d"]] as [string, string][],
+};
+
 export function DAGDiagram() {
-  // Stylized DAG with animated flow lines
-  const nodes = [
-    { id: "A", x: 60, y: 110, label: "Research", agent: "claude-r1" },
-    { id: "B1", x: 230, y: 50, label: "Draft §1", agent: "gpt-w2" },
-    { id: "B2", x: 230, y: 110, label: "Draft §2", agent: "gpt-w2" },
-    { id: "B3", x: 230, y: 170, label: "Draft §3", agent: "llama-w7" },
-    { id: "C", x: 410, y: 110, label: "Reduce", agent: "merge-bot" },
-    { id: "D", x: 580, y: 110, label: "TEE Verify", agent: "0g-tee" },
-  ];
-  const edges: [string, string][] = [
-    ["A", "B1"], ["A", "B2"], ["A", "B3"],
-    ["B1", "C"], ["B2", "C"], ["B3", "C"],
-    ["C", "D"],
-  ];
-  const find = (id: string) => nodes.find((n) => n.id === id)!;
+  const dags = useMesh((s) => s.dags);
+  const live = dags.find((d) => d.status === "Executing" || d.status === "Bidding") || dags[0];
+
+  if (live) {
+    return (
+      <div className="card-soft p-4 md:p-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">Live Task DAG</p>
+            <p className="font-mono text-xs text-muted-foreground/70 mt-1">{live.id}</p>
+          </div>
+          <span className="chip"><span className="dot pulse-dot" /> {live.status}</span>
+        </div>
+        <DAGGraph nodes={live.nodes} edges={live.edges} height={280} />
+        <div className="mt-3 grid grid-cols-3 gap-3 text-xs">
+          <Stat l="Nodes" v={String(live.nodes.length)} />
+          <Stat l="Locked" v={`${live.locked.toFixed(2)} OG`} />
+          <Stat l="Released" v={`${live.released.toFixed(2)} OG`} />
+        </div>
+        <Link to="/explorer/$dagId" params={{ dagId: live.id }} className="text-xs text-muted-foreground hover:text-accent mt-3 inline-block">
+          Inspect in Explorer -&gt;
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative card-soft p-6 overflow-hidden">
-      <div className="absolute inset-0 grid-lines opacity-40 pointer-events-none" />
-      <div className="flex items-center justify-between mb-4 relative">
+    <div className="card-soft p-4 md:p-6">
+      <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground">Live Task DAG</p>
-          <p className="font-mono text-xs text-muted-foreground/70 mt-1">0xa1b2…f93e</p>
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Sample Task DAG</p>
+          <p className="font-mono text-xs text-muted-foreground/70 mt-1">submit one to see live data</p>
         </div>
-        <span className="chip"><span className="dot pulse-dot" /> Executing</span>
+        <span className="chip">Preview</span>
       </div>
-      <svg viewBox="0 0 660 240" className="w-full h-auto relative">
-        <defs>
-          <linearGradient id="edge" x1="0" x2="1">
-            <stop offset="0" stopColor="oklch(0.78 0.16 65)" stopOpacity="0.2" />
-            <stop offset="1" stopColor="oklch(0.78 0.16 65)" stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
-        {edges.map(([from, to], i) => {
-          const a = find(from); const b = find(to);
-          return (
-            <path
-              key={i}
-              d={`M${a.x + 50},${a.y} C${(a.x + b.x) / 2 + 30},${a.y} ${(a.x + b.x) / 2 - 30},${b.y} ${b.x},${b.y}`}
-              stroke="url(#edge)"
-              strokeWidth="1.5"
-              fill="none"
-              className="flow-line"
-            />
-          );
-        })}
-        {nodes.map((n) => (
-          <g key={n.id} transform={`translate(${n.x},${n.y - 22})`}>
-            <rect width="100" height="44" rx="10" fill="oklch(0.22 0.016 250)" stroke="oklch(0.32 0.018 250)" />
-            <circle cx="12" cy="22" r="3" fill="oklch(0.82 0.18 145)" />
-            <text x="22" y="20" fill="oklch(0.97 0.005 80)" fontSize="11" fontFamily="Inter">{n.label}</text>
-            <text x="22" y="34" fill="oklch(0.68 0.015 250)" fontSize="9" fontFamily="JetBrains Mono">{n.agent}</text>
-          </g>
-        ))}
-      </svg>
-      <div className="mt-4 grid grid-cols-3 gap-3 text-xs">
-        {[
-          { l: "Nodes", v: "6" },
-          { l: "Locked", v: "12.4 OG" },
-          { l: "ETA", v: "~38s" },
-        ].map((s) => (
-          <div key={s.l} className="rounded-lg border border-border/60 p-3">
-            <p className="text-muted-foreground">{s.l}</p>
-            <p className="font-mono text-sm mt-1">{s.v}</p>
-          </div>
-        ))}
-      </div>
+      <DAGGraph nodes={SAMPLE.nodes as any} edges={SAMPLE.edges} height={280} />
+      <Link to="/dashboard" className="text-xs text-muted-foreground hover:text-accent mt-3 inline-block">
+        Submit your first DAG -&gt;
+      </Link>
+    </div>
+  );
+}
+
+function Stat({ l, v }: { l: string; v: string }) {
+  return (
+    <div className="rounded-lg border border-border/60 p-3">
+      <p className="text-muted-foreground">{l}</p>
+      <p className="font-mono text-sm mt-1">{v}</p>
     </div>
   );
 }

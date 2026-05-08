@@ -5,9 +5,9 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const Route = createFileRoute("/protocol")({
   head: () => ({
     meta: [
-      { title: "Protocol — SynapseMesh" },
+      { title: "Protocol - SynapseMesh" },
       { name: "description", content: "The seven on-chain components powering SynapseMesh: Task DAGs, MeshEscrow, AgentRegistry, BidAuction, TEEVerifierBridge and more." },
-      { property: "og:title", content: "Protocol — SynapseMesh" },
+      { property: "og:title", content: "Protocol - SynapseMesh" },
       { property: "og:description", content: "On-chain components and contract surface of SynapseMesh." },
     ],
   }),
@@ -60,7 +60,7 @@ function ProtocolPage() {
               <h2 className="editorial-h2 text-4xl">The TaskNode struct</h2>
               <p className="text-muted-foreground mt-5 leading-relaxed">
                 Every node in a DAG is typed and hashed. Inputs, outputs and rubric live on 0G Storage Log,
-                referenced by content hash. Contracts only ever touch the roots — cheap, verifiable, immutable.
+                referenced by content hash. Contracts only ever touch the roots - cheap, verifiable, immutable.
               </p>
             </div>
             <pre className="lg:col-span-7 card-soft p-6 overflow-x-auto text-xs font-mono leading-relaxed text-muted-foreground">

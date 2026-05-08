@@ -9,15 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettlementsRouteImport } from './routes/settlements'
 import { Route as ProtocolRouteImport } from './routes/protocol'
+import { Route as ExplorerRouteImport } from './routes/explorer'
 import { Route as DocsRouteImport } from './routes/docs'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ExplorerDagIdRouteImport } from './routes/explorer.$dagId'
+import { Route as AgentsAgentIdRouteImport } from './routes/agents.$agentId'
 
+const SettlementsRoute = SettlementsRouteImport.update({
+  id: '/settlements',
+  path: '/settlements',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProtocolRoute = ProtocolRouteImport.update({
   id: '/protocol',
   path: '/protocol',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExplorerRoute = ExplorerRouteImport.update({
+  id: '/explorer',
+  path: '/explorer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsRoute = DocsRouteImport.update({
@@ -40,52 +54,118 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExplorerDagIdRoute = ExplorerDagIdRouteImport.update({
+  id: '/$dagId',
+  path: '/$dagId',
+  getParentRoute: () => ExplorerRoute,
+} as any)
+const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
+  id: '/$agentId',
+  path: '/$agentId',
+  getParentRoute: () => AgentsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/agents': typeof AgentsRoute
+  '/agents': typeof AgentsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/docs': typeof DocsRoute
+  '/explorer': typeof ExplorerRouteWithChildren
   '/protocol': typeof ProtocolRoute
+  '/settlements': typeof SettlementsRoute
+  '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/explorer/$dagId': typeof ExplorerDagIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/agents': typeof AgentsRoute
+  '/agents': typeof AgentsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/docs': typeof DocsRoute
+  '/explorer': typeof ExplorerRouteWithChildren
   '/protocol': typeof ProtocolRoute
+  '/settlements': typeof SettlementsRoute
+  '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/explorer/$dagId': typeof ExplorerDagIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/agents': typeof AgentsRoute
+  '/agents': typeof AgentsRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/docs': typeof DocsRoute
+  '/explorer': typeof ExplorerRouteWithChildren
   '/protocol': typeof ProtocolRoute
+  '/settlements': typeof SettlementsRoute
+  '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/explorer/$dagId': typeof ExplorerDagIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agents' | '/dashboard' | '/docs' | '/protocol'
+  fullPaths:
+    | '/'
+    | '/agents'
+    | '/dashboard'
+    | '/docs'
+    | '/explorer'
+    | '/protocol'
+    | '/settlements'
+    | '/agents/$agentId'
+    | '/explorer/$dagId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agents' | '/dashboard' | '/docs' | '/protocol'
-  id: '__root__' | '/' | '/agents' | '/dashboard' | '/docs' | '/protocol'
+  to:
+    | '/'
+    | '/agents'
+    | '/dashboard'
+    | '/docs'
+    | '/explorer'
+    | '/protocol'
+    | '/settlements'
+    | '/agents/$agentId'
+    | '/explorer/$dagId'
+  id:
+    | '__root__'
+    | '/'
+    | '/agents'
+    | '/dashboard'
+    | '/docs'
+    | '/explorer'
+    | '/protocol'
+    | '/settlements'
+    | '/agents/$agentId'
+    | '/explorer/$dagId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AgentsRoute: typeof AgentsRoute
+  AgentsRoute: typeof AgentsRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   DocsRoute: typeof DocsRoute
+  ExplorerRoute: typeof ExplorerRouteWithChildren
   ProtocolRoute: typeof ProtocolRoute
+  SettlementsRoute: typeof SettlementsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settlements': {
+      id: '/settlements'
+      path: '/settlements'
+      fullPath: '/settlements'
+      preLoaderRoute: typeof SettlementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/protocol': {
       id: '/protocol'
       path: '/protocol'
       fullPath: '/protocol'
       preLoaderRoute: typeof ProtocolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explorer': {
+      id: '/explorer'
+      path: '/explorer'
+      fullPath: '/explorer'
+      preLoaderRoute: typeof ExplorerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs': {
@@ -116,15 +196,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/explorer/$dagId': {
+      id: '/explorer/$dagId'
+      path: '/$dagId'
+      fullPath: '/explorer/$dagId'
+      preLoaderRoute: typeof ExplorerDagIdRouteImport
+      parentRoute: typeof ExplorerRoute
+    }
+    '/agents/$agentId': {
+      id: '/agents/$agentId'
+      path: '/$agentId'
+      fullPath: '/agents/$agentId'
+      preLoaderRoute: typeof AgentsAgentIdRouteImport
+      parentRoute: typeof AgentsRoute
+    }
   }
 }
 
+interface AgentsRouteChildren {
+  AgentsAgentIdRoute: typeof AgentsAgentIdRoute
+}
+
+const AgentsRouteChildren: AgentsRouteChildren = {
+  AgentsAgentIdRoute: AgentsAgentIdRoute,
+}
+
+const AgentsRouteWithChildren =
+  AgentsRoute._addFileChildren(AgentsRouteChildren)
+
+interface ExplorerRouteChildren {
+  ExplorerDagIdRoute: typeof ExplorerDagIdRoute
+}
+
+const ExplorerRouteChildren: ExplorerRouteChildren = {
+  ExplorerDagIdRoute: ExplorerDagIdRoute,
+}
+
+const ExplorerRouteWithChildren = ExplorerRoute._addFileChildren(
+  ExplorerRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AgentsRoute: AgentsRoute,
+  AgentsRoute: AgentsRouteWithChildren,
   DashboardRoute: DashboardRoute,
   DocsRoute: DocsRoute,
+  ExplorerRoute: ExplorerRouteWithChildren,
   ProtocolRoute: ProtocolRoute,
+  SettlementsRoute: SettlementsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
