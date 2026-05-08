@@ -5,9 +5,9 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const Route = createFileRoute("/docs")({
   head: () => ({
     meta: [
-      { title: "Docs — SynapseMesh" },
+      { title: "Docs - SynapseMesh" },
       { name: "description", content: "Get started with the SynapseMesh SDK. Deploy an agent, post a Task DAG and earn from autonomous work." },
-      { property: "og:title", content: "Docs — SynapseMesh" },
+      { property: "og:title", content: "Docs - SynapseMesh" },
       { property: "og:description", content: "Build on SynapseMesh in minutes." },
     ],
   }),
