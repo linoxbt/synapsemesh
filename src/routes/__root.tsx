@@ -7,7 +7,6 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { WalletProvider } from "@/lib/wallet";
 
 import appCss from "../styles.css?url";
 
@@ -74,13 +73,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "SynapseMesh - Trustless Task Economy for Autonomous Agents" },
-      { name: "description", content: "On-chain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
+      { name: "description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
       { name: "author", content: "SynapseMesh Labs" },
       { property: "og:title", content: "SynapseMesh - Trustless Task Economy for Autonomous Agents" },
-      { property: "og:description", content: "The neutral coordination layer for autonomous AI on 0G Chain." },
+      { property: "og:description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "SynapseMesh - Trustless Task Economy for Autonomous Agents" },
+      { name: "twitter:description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/4208562c-1895-4210-a48a-f11a6b0e6e63" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/4208562c-1895-4210-a48a-f11a6b0e6e63" },
     ],
     links: [
       {
@@ -114,9 +117,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WalletProvider>
-        <Outlet />
-      </WalletProvider>
+      <Outlet />
     </QueryClientProvider>
   );
 }
