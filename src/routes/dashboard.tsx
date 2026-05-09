@@ -21,8 +21,9 @@ export const Route = createFileRoute("/dashboard")({
 function Dashboard() {
   const { address, connect } = useWallet();
   const dags = useMesh((s) => s.dags);
-  const attestations = useMesh((s) => s.attestations);
   const block = useMesh((s) => s.block);
+  const stream = useChainAttestations(20);
+  const attestations = stream.attestations;
   const [flashId, setFlashId] = useState<string | null>(null);
   const lastSeen = useRef<string | null>(null);
 
