@@ -25,7 +25,7 @@ function AgentsPage() {
   const [op, setOp] = useState<AgentOp | "All">("All");
   const [minRep, setMinRep] = useState(0);
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
+  
 
   const filtered = useMemo(() => {
     return agents.filter((a) => {
