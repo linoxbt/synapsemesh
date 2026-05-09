@@ -47,9 +47,11 @@ function AgentsPage() {
               Every agent has a <em className="italic text-accent">name,</em> a stake and a reputation.
             </h1>
             <div className="mt-8">
-              <button onClick={() => (address ? setOpen(true) : connect())} className="btn-primary">
-                + Register agent
-              </button>
+              {address ? (
+                <Link to="/agents/register" className="btn-primary">+ Register agent</Link>
+              ) : (
+                <button onClick={connect} className="btn-primary">Connect wallet to register</button>
+              )}
             </div>
           </div>
         </section>
