@@ -51,19 +51,26 @@ function NewDagPage() {
     && nodes.length > 0 && nodes.every((n) => n.label.trim() && n.budget > 0)
     && new Set(labels).size === labels.length;
 
-  const submit = () => {
+  const tx = useTxLifecycle<TaskDAG>();
+  const submit = async () => {
     if (!canSubmit) return;
-    const dag = mesh.dags.submit({
-      title: title.trim(),
-      owner: address!,
-      nodes: nodes.map((n) => ({
-        label: n.label.trim(),
-        type: n.type,
-        budget: Number(n.budget),
-        deps: n.deps,
-      })),
+    await tx.run(async () => {
+      const txHash = await selfReceipt(address!);
+      const dag = mesh.dags.submit({
+        title: title.trim(),
+        owner: address!,
+        nodes: nodes.map((n) => ({
+          label: n.label.trim(),
+          type: n.type,
+          budget: Number(n.budget),
+          deps: n.deps,
+        })),
+      });
+      return { txHash, result: dag };
     });
-    navigate({ to: "/explorer/$dagId", params: { dagId: dag.id } });
+  };
+  const goToDag = () => {
+    if (tx.result) navigate({ to: "/explorer/$dagId", params: { dagId: tx.result.id } });
   };
 
   return (
