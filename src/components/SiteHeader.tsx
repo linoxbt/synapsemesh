@@ -8,6 +8,7 @@ const links = [
   { to: "/agents", label: "Agents" },
   { to: "/explorer", label: "Explorer" },
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/dags/new", label: "Submit DAG" },
   { to: "/settlements", label: "Settlements" },
   { to: "/docs", label: "Docs" },
 ] as const;
