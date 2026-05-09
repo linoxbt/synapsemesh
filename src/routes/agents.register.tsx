@@ -33,16 +33,23 @@ function RegisterAgentPage() {
   const capList = caps.split(",").map((c) => c.trim()).filter(Boolean);
   const canSubmit = !!address && isCorrectChain && name.trim().length > 0 && stake > 0 && capList.length > 0;
 
-  const submit = () => {
+  const tx = useTxLifecycle<Agent>();
+  const submit = async () => {
     if (!canSubmit) return;
-    const a = mesh.agents.register({
-      name: name.trim(),
-      op,
-      stake,
-      capabilities: capList,
-      owner: address!,
+    await tx.run(async () => {
+      const txHash = await selfReceipt(address!);
+      const a = mesh.agents.register({
+        name: name.trim(),
+        op,
+        stake,
+        capabilities: capList,
+        owner: address!,
+      });
+      return { txHash, result: a };
     });
-    navigate({ to: "/agents/$agentId", params: { agentId: a.id } });
+  };
+  const goToAgent = () => {
+    if (tx.result) navigate({ to: "/agents/$agentId", params: { agentId: tx.result.id } });
   };
 
   return (
