@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { useMesh } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
+import { useChainAttestations, explorerTx, explorerAddr, TEE_VERIFIER } from "@/lib/chainStream";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -20,8 +21,9 @@ export const Route = createFileRoute("/dashboard")({
 function Dashboard() {
   const { address, connect } = useWallet();
   const dags = useMesh((s) => s.dags);
-  const attestations = useMesh((s) => s.attestations);
   const block = useMesh((s) => s.block);
+  const stream = useChainAttestations(20);
+  const attestations = stream.attestations;
   const [flashId, setFlashId] = useState<string | null>(null);
   const lastSeen = useRef<string | null>(null);
 
@@ -107,10 +109,20 @@ function Dashboard() {
           <div className="card-soft p-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-2xl">Live TEE feed</h2>
-              <span className="chip text-[10px]"><span className="dot pulse-dot" /> streaming</span>
+              <StreamPill status={stream.status} />
             </div>
+            <p className="text-[10px] text-muted-foreground mt-1 font-mono truncate">
+              {TEE_VERIFIER ? `verifier ${TEE_VERIFIER.slice(0, 10)}…` : "verifier contract not configured"}
+              {stream.cursorBlock !== null && ` · cursor ${stream.cursorBlock.toLocaleString()}`}
+            </p>
             {attestations.length === 0 ? (
-              <p className="mt-6 text-sm text-muted-foreground">No attestations yet. Submit a Task DAG to see TEE verifier activity stream in real time.</p>
+              <p className="mt-6 text-sm text-muted-foreground">
+                {stream.status === "unconfigured"
+                  ? "Set VITE_TEE_VERIFIER_ADDRESS to stream live AttestationPosted events from 0G Chain."
+                  : stream.status === "error"
+                  ? `Reconnecting to RPC... ${stream.error ?? ""}`
+                  : "Listening for new TEE attestations on 0G Chain."}
+              </p>
             ) : (
               <ul className="mt-5 space-y-3">
                 {attestations.slice(0, 10).map((a) => (
@@ -119,12 +131,15 @@ function Dashboard() {
                     className={`flex items-center justify-between text-sm p-2 -mx-2 rounded-lg transition-colors ${flashId === a.id ? "bg-signal/10 ring-1 ring-signal/40" : ""}`}
                   >
                     <div className="min-w-0">
-                      <p className="font-mono truncate">{a.agentName}</p>
-                      <Link to="/explorer/$dagId" params={{ dagId: a.dagId }}
-                        className="text-[11px] text-muted-foreground font-mono truncate hover:text-accent block">
-                        {a.dagId}/{a.nodeId}
-                      </Link>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">+{a.payout.toFixed(3)} OG · {a.teeImage}</p>
+                      <a href={explorerAddr(a.agent)} target="_blank" rel="noreferrer"
+                         className="font-mono truncate hover:text-accent block">
+                        {a.agent.slice(0, 6)}…{a.agent.slice(-4)}
+                      </a>
+                      <a href={explorerTx(a.txHash)} target="_blank" rel="noreferrer"
+                         className="text-[11px] text-muted-foreground font-mono truncate hover:text-accent block">
+                        {a.txHash.slice(0, 10)}…
+                      </a>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">+{a.payout.toFixed(4)} OG · block {a.blockNumber.toLocaleString()}</p>
                     </div>
                     <span className="font-display text-2xl text-signal">{a.score}</span>
                   </li>
@@ -138,6 +153,22 @@ function Dashboard() {
       </main>
       <SiteFooter />
     </div>
+  );
+}
+
+function StreamPill({ status }: { status: string }) {
+  const tone = status === "live" ? "text-signal border-signal/40"
+    : status === "error" ? "text-destructive border-destructive/40"
+    : status === "unconfigured" ? "text-muted-foreground border-border"
+    : "text-accent border-accent/40";
+  const label = status === "live" ? "live"
+    : status === "error" ? "reconnecting"
+    : status === "unconfigured" ? "not configured"
+    : "connecting";
+  return (
+    <span className={`chip text-[10px] ${tone}`}>
+      <span className={`dot ${status === "live" ? "pulse-dot" : ""}`} /> {label}
+    </span>
   );
 }
 

@@ -2,8 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { mesh, type AgentOp } from "@/lib/sdk";
+import { TxStatusPanel } from "@/components/TxStatusPanel";
+import { mesh, type AgentOp, type Agent } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
+import { useTxLifecycle, selfReceipt } from "@/lib/tx";
 
 export const Route = createFileRoute("/agents/register")({
   head: () => ({
@@ -31,16 +33,23 @@ function RegisterAgentPage() {
   const capList = caps.split(",").map((c) => c.trim()).filter(Boolean);
   const canSubmit = !!address && isCorrectChain && name.trim().length > 0 && stake > 0 && capList.length > 0;
 
-  const submit = () => {
+  const tx = useTxLifecycle<Agent>();
+  const submit = async () => {
     if (!canSubmit) return;
-    const a = mesh.agents.register({
-      name: name.trim(),
-      op,
-      stake,
-      capabilities: capList,
-      owner: address!,
+    await tx.run(async () => {
+      const txHash = await selfReceipt(address!);
+      const a = mesh.agents.register({
+        name: name.trim(),
+        op,
+        stake,
+        capabilities: capList,
+        owner: address!,
+      });
+      return { txHash, result: a };
     });
-    navigate({ to: "/agents/$agentId", params: { agentId: a.id } });
+  };
+  const goToAgent = () => {
+    if (tx.result) navigate({ to: "/agents/$agentId", params: { agentId: tx.result.id } });
   };
 
   return (
@@ -115,12 +124,18 @@ function RegisterAgentPage() {
               <button onClick={connect} className="btn-primary w-full">Connect wallet</button>
             ) : !isCorrectChain ? (
               <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G</button>
+            ) : tx.status === "success" ? (
+              <button onClick={goToAgent} className="btn-primary w-full">Open agent profile -&gt;</button>
             ) : (
-              <button onClick={submit} disabled={!canSubmit}
+              <button onClick={submit}
+                disabled={!canSubmit || tx.status === "pending" || tx.status === "awaitingWallet"}
                 className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed">
-                Stake {stake} OG &amp; mint INFT
+                {tx.status === "awaitingWallet" ? "Confirm in wallet..."
+                  : tx.status === "pending" ? "Minting..."
+                  : `Stake ${stake} OG & mint INFT`}
               </button>
             )}
+            <TxStatusPanel tx={tx} labels={{ pending: "Locking stake & minting INFT", success: "Agent registered on-chain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
               Calls AgentRegistry.register() then mints an ERC-7857 INFT in a single tx.
             </p>

@@ -2,8 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { mesh, type NodeType } from "@/lib/sdk";
+import { TxStatusPanel } from "@/components/TxStatusPanel";
+import { mesh, type NodeType, type TaskDAG } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
+import { useTxLifecycle, selfReceipt } from "@/lib/tx";
 
 export const Route = createFileRoute("/dags/new")({
   head: () => ({
@@ -49,19 +51,26 @@ function NewDagPage() {
     && nodes.length > 0 && nodes.every((n) => n.label.trim() && n.budget > 0)
     && new Set(labels).size === labels.length;
 
-  const submit = () => {
+  const tx = useTxLifecycle<TaskDAG>();
+  const submit = async () => {
     if (!canSubmit) return;
-    const dag = mesh.dags.submit({
-      title: title.trim(),
-      owner: address!,
-      nodes: nodes.map((n) => ({
-        label: n.label.trim(),
-        type: n.type,
-        budget: Number(n.budget),
-        deps: n.deps,
-      })),
+    await tx.run(async () => {
+      const txHash = await selfReceipt(address!);
+      const dag = mesh.dags.submit({
+        title: title.trim(),
+        owner: address!,
+        nodes: nodes.map((n) => ({
+          label: n.label.trim(),
+          type: n.type,
+          budget: Number(n.budget),
+          deps: n.deps,
+        })),
+      });
+      return { txHash, result: dag };
     });
-    navigate({ to: "/explorer/$dagId", params: { dagId: dag.id } });
+  };
+  const goToDag = () => {
+    if (tx.result) navigate({ to: "/explorer/$dagId", params: { dagId: tx.result.id } });
   };
 
   return (
@@ -174,15 +183,20 @@ function NewDagPage() {
               <button onClick={connect} className="btn-primary w-full">Connect wallet</button>
             ) : !isCorrectChain ? (
               <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G</button>
+            ) : tx.status === "success" ? (
+              <button onClick={goToDag} className="btn-primary w-full">Open Task DAG -&gt;</button>
             ) : (
               <button
                 onClick={submit}
-                disabled={!canSubmit}
+                disabled={!canSubmit || tx.status === "pending" || tx.status === "awaitingWallet"}
                 className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Lock {totalBudget.toFixed(2)} OG &amp; submit
+                {tx.status === "awaitingWallet" ? "Confirm in wallet..."
+                  : tx.status === "pending" ? "Submitting..."
+                  : `Lock ${totalBudget.toFixed(2)} OG & submit`}
               </button>
             )}
+            <TxStatusPanel tx={tx} labels={{ pending: "Locking budget in MeshEscrow", success: "Task DAG submitted on-chain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
               Calls TaskDAG.submit() then MeshEscrow.lock() in a single tx.
             </p>
