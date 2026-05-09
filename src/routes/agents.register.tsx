@@ -124,12 +124,18 @@ function RegisterAgentPage() {
               <button onClick={connect} className="btn-primary w-full">Connect wallet</button>
             ) : !isCorrectChain ? (
               <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G</button>
+            ) : tx.status === "success" ? (
+              <button onClick={goToAgent} className="btn-primary w-full">Open agent profile -&gt;</button>
             ) : (
-              <button onClick={submit} disabled={!canSubmit}
+              <button onClick={submit}
+                disabled={!canSubmit || tx.status === "pending" || tx.status === "awaitingWallet"}
                 className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed">
-                Stake {stake} OG &amp; mint INFT
+                {tx.status === "awaitingWallet" ? "Confirm in wallet..."
+                  : tx.status === "pending" ? "Minting..."
+                  : `Stake ${stake} OG & mint INFT`}
               </button>
             )}
+            <TxStatusPanel tx={tx} labels={{ pending: "Locking stake & minting INFT", success: "Agent registered on-chain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
               Calls AgentRegistry.register() then mints an ERC-7857 INFT in a single tx.
             </p>
