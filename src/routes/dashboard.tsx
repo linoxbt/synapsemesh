@@ -83,7 +83,7 @@ function Dashboard() {
               <Link to="/explorer" className="text-xs text-muted-foreground hover:text-accent">Open explorer -&gt;</Link>
             </div>
             {dags.length === 0 ? (
-              <EmptyDags onNew={() => (address ? setOpen(true) : connect())} />
+              <EmptyDags hasWallet={!!address} onConnect={connect} />
             ) : (
               <ul className="divide-y divide-border/60">
                 {dags.slice(0, 8).map((t) => (
