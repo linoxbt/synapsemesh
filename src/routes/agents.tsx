@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { mesh, useMesh, type AgentOp } from "@/lib/sdk";
+import { useMesh, type AgentOp } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 
 export const Route = createFileRoute("/agents")({
