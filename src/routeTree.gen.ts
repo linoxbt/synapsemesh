@@ -18,6 +18,7 @@ import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ExplorerDagIdRouteImport } from './routes/explorer.$dagId'
 import { Route as DagsNewRouteImport } from './routes/dags.new'
+import { Route as AgentsRegisterRouteImport } from './routes/agents.register'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents.$agentId'
 
 const SettlementsRoute = SettlementsRouteImport.update({
@@ -65,6 +66,11 @@ const DagsNewRoute = DagsNewRouteImport.update({
   path: '/dags/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsRegisterRoute = AgentsRegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => AgentsRoute,
+} as any)
 const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
   id: '/$agentId',
   path: '/$agentId',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/protocol': typeof ProtocolRoute
   '/settlements': typeof SettlementsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/agents/register': typeof AgentsRegisterRoute
   '/dags/new': typeof DagsNewRoute
   '/explorer/$dagId': typeof ExplorerDagIdRoute
 }
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/protocol': typeof ProtocolRoute
   '/settlements': typeof SettlementsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/agents/register': typeof AgentsRegisterRoute
   '/dags/new': typeof DagsNewRoute
   '/explorer/$dagId': typeof ExplorerDagIdRoute
 }
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/protocol': typeof ProtocolRoute
   '/settlements': typeof SettlementsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/agents/register': typeof AgentsRegisterRoute
   '/dags/new': typeof DagsNewRoute
   '/explorer/$dagId': typeof ExplorerDagIdRoute
 }
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/protocol'
     | '/settlements'
     | '/agents/$agentId'
+    | '/agents/register'
     | '/dags/new'
     | '/explorer/$dagId'
   fileRoutesByTo: FileRoutesByTo
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/protocol'
     | '/settlements'
     | '/agents/$agentId'
+    | '/agents/register'
     | '/dags/new'
     | '/explorer/$dagId'
   id:
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/protocol'
     | '/settlements'
     | '/agents/$agentId'
+    | '/agents/register'
     | '/dags/new'
     | '/explorer/$dagId'
   fileRoutesById: FileRoutesById
@@ -223,6 +235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DagsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents/register': {
+      id: '/agents/register'
+      path: '/register'
+      fullPath: '/agents/register'
+      preLoaderRoute: typeof AgentsRegisterRouteImport
+      parentRoute: typeof AgentsRoute
+    }
     '/agents/$agentId': {
       id: '/agents/$agentId'
       path: '/$agentId'
@@ -235,10 +254,12 @@ declare module '@tanstack/react-router' {
 
 interface AgentsRouteChildren {
   AgentsAgentIdRoute: typeof AgentsAgentIdRoute
+  AgentsRegisterRoute: typeof AgentsRegisterRoute
 }
 
 const AgentsRouteChildren: AgentsRouteChildren = {
   AgentsAgentIdRoute: AgentsAgentIdRoute,
+  AgentsRegisterRoute: AgentsRegisterRoute,
 }
 
 const AgentsRouteWithChildren =
