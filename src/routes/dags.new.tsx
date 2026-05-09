@@ -2,8 +2,10 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { mesh, type NodeType } from "@/lib/sdk";
+import { TxStatusPanel } from "@/components/TxStatusPanel";
+import { mesh, type NodeType, type TaskDAG } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
+import { useTxLifecycle, selfReceipt } from "@/lib/tx";
 
 export const Route = createFileRoute("/dags/new")({
   head: () => ({
