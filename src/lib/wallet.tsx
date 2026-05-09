@@ -101,10 +101,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+const FALLBACK: WalletCtx = {
+  address: null,
+  chainId: null,
+  connecting: false,
+  connect: async () => {},
+  disconnect: () => {},
+  switchToZg: async () => {},
+  isCorrectChain: false,
+};
+
 export function useWallet() {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useWallet must be used within WalletProvider");
-  return v;
+  return useContext(Ctx) ?? FALLBACK;
 }
 
 export function shortAddr(a: string | null) {
