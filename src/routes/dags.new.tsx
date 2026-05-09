@@ -183,15 +183,20 @@ function NewDagPage() {
               <button onClick={connect} className="btn-primary w-full">Connect wallet</button>
             ) : !isCorrectChain ? (
               <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G</button>
+            ) : tx.status === "success" ? (
+              <button onClick={goToDag} className="btn-primary w-full">Open Task DAG -&gt;</button>
             ) : (
               <button
                 onClick={submit}
-                disabled={!canSubmit}
+                disabled={!canSubmit || tx.status === "pending" || tx.status === "awaitingWallet"}
                 className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Lock {totalBudget.toFixed(2)} OG &amp; submit
+                {tx.status === "awaitingWallet" ? "Confirm in wallet..."
+                  : tx.status === "pending" ? "Submitting..."
+                  : `Lock ${totalBudget.toFixed(2)} OG & submit`}
               </button>
             )}
+            <TxStatusPanel tx={tx} labels={{ pending: "Locking budget in MeshEscrow", success: "Task DAG submitted on-chain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
               Calls TaskDAG.submit() then MeshEscrow.lock() in a single tx.
             </p>
