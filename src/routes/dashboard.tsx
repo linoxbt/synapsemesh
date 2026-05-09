@@ -60,12 +60,11 @@ function Dashboard() {
               <span className="chip"><span className="dot pulse-dot" /> Synced · block {block.toLocaleString()}</span>
               <h1 className="editorial-h1 text-4xl md:text-5xl mt-4">Network dashboard</h1>
             </div>
-            <button
-              className="btn-primary"
-              onClick={() => (address ? setOpen(true) : connect())}
-            >
-              + New Task DAG
-            </button>
+            {address ? (
+              <Link to="/dags/new" className="btn-primary">+ New Task DAG</Link>
+            ) : (
+              <button className="btn-primary" onClick={connect}>Connect to submit</button>
+            )}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
             {stats.map((s) => (
