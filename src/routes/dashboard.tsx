@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { useMesh } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
+import { useChainAttestations, explorerTx, explorerAddr, TEE_VERIFIER } from "@/lib/chainStream";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
