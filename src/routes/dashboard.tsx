@@ -105,39 +105,54 @@ function Dashboard() {
           </div>
 
           <div className="card-soft p-6">
-            <h2 className="font-display text-2xl">Recent attestations</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-2xl">Live TEE feed</h2>
+              <span className="chip text-[10px]"><span className="dot pulse-dot" /> streaming</span>
+            </div>
             {attestations.length === 0 ? (
               <p className="mt-6 text-sm text-muted-foreground">No attestations yet. Submit a Task DAG to see TEE verifier activity stream in real time.</p>
             ) : (
-              <ul className="mt-5 space-y-4">
-                {attestations.slice(0, 8).map((a) => (
-                  <li key={a.id} className="flex items-center justify-between text-sm">
+              <ul className="mt-5 space-y-3">
+                {attestations.slice(0, 10).map((a) => (
+                  <li
+                    key={a.id}
+                    className={`flex items-center justify-between text-sm p-2 -mx-2 rounded-lg transition-colors ${flashId === a.id ? "bg-signal/10 ring-1 ring-signal/40" : ""}`}
+                  >
                     <div className="min-w-0">
                       <p className="font-mono truncate">{a.agentName}</p>
-                      <p className="text-xs text-muted-foreground truncate">{a.dagId}/{a.nodeId}</p>
+                      <Link to="/explorer/$dagId" params={{ dagId: a.dagId }}
+                        className="text-[11px] text-muted-foreground font-mono truncate hover:text-accent block">
+                        {a.dagId}/{a.nodeId}
+                      </Link>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">+{a.payout.toFixed(3)} OG · {a.teeImage}</p>
                     </div>
                     <span className="font-display text-2xl text-signal">{a.score}</span>
                   </li>
                 ))}
               </ul>
             )}
+            <div className="hairline my-4" />
+            <Link to="/settlements" className="text-xs text-muted-foreground hover:text-accent">All settlements -&gt;</Link>
           </div>
         </section>
       </main>
       <SiteFooter />
-      {open && <NewDagDialog onClose={() => setOpen(false)} owner={address!} />}
     </div>
   );
 }
 
-function EmptyDags({ onNew }: { onNew: () => void }) {
+function EmptyDags({ hasWallet, onConnect }: { hasWallet: boolean; onConnect: () => void }) {
   return (
     <div className="py-14 text-center">
       <p className="font-display text-2xl">No Task DAGs yet</p>
       <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
         Submit a DAG to lock budget in MeshEscrow and watch agents bid, execute and settle on-chain.
       </p>
-      <button onClick={onNew} className="btn-primary mt-6">+ Submit first DAG</button>
+      {hasWallet ? (
+        <Link to="/dags/new" className="btn-primary mt-6 inline-block">+ Submit first DAG</Link>
+      ) : (
+        <button onClick={onConnect} className="btn-primary mt-6">Connect wallet</button>
+      )}
     </div>
   );
 }
@@ -153,83 +168,3 @@ export function StatusPill({ s }: { s: string }) {
   return <span className={`inline-block mt-1 text-[10px] uppercase tracking-widest border rounded-full px-2 py-0.5 ${tone}`}>{s}</span>;
 }
 
-const TEMPLATES: Array<{ name: string; title: string; nodes: Array<{ label: string; type: NodeType; budget: number; deps?: string[] }> }> = [
-  {
-    name: "Research pipeline",
-    title: "Quarterly research pipeline",
-    nodes: [
-      { label: "Research", type: "SEQUENTIAL", budget: 2 },
-      { label: "Draft A", type: "PARALLEL", budget: 1.5, deps: ["Research"] },
-      { label: "Draft B", type: "PARALLEL", budget: 1.5, deps: ["Research"] },
-      { label: "Merge", type: "REDUCE", budget: 1, deps: ["Draft A", "Draft B"] },
-      { label: "Verify", type: "SEQUENTIAL", budget: 0.5, deps: ["Merge"] },
-    ],
-  },
-  {
-    name: "Content batch",
-    title: "Multilingual content batch",
-    nodes: [
-      { label: "Outline", type: "SEQUENTIAL", budget: 1 },
-      { label: "Draft EN", type: "PARALLEL", budget: 2, deps: ["Outline"] },
-      { label: "Draft ES", type: "PARALLEL", budget: 2, deps: ["Outline"] },
-      { label: "Draft FR", type: "PARALLEL", budget: 2, deps: ["Outline"] },
-      { label: "QA", type: "REDUCE", budget: 1, deps: ["Draft EN", "Draft ES", "Draft FR"] },
-    ],
-  },
-  {
-    name: "Vision tagging",
-    title: "Vision tagging stream",
-    nodes: [
-      { label: "Ingest", type: "SEQUENTIAL", budget: 0.5 },
-      { label: "Tag", type: "PARALLEL", budget: 3, deps: ["Ingest"] },
-      { label: "Verify", type: "SEQUENTIAL", budget: 0.5, deps: ["Tag"] },
-    ],
-  },
-];
-
-function NewDagDialog({ onClose, owner }: { onClose: () => void; owner: string }) {
-  const [title, setTitle] = useState(TEMPLATES[0].title);
-  const [tplIdx, setTplIdx] = useState(0);
-
-  const submit = () => {
-    const tpl = TEMPLATES[tplIdx];
-    mesh.dags.submit({ title, owner, nodes: tpl.nodes });
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
-      <div className="card-soft p-8 w-full max-w-lg bg-background" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-display text-2xl">Submit Task DAG</h3>
-        <p className="text-sm text-muted-foreground mt-2">Locks budget into MeshEscrow.sol on 0G Chain. Releases per node on TEE attestation.</p>
-
-        <label className="block mt-6 text-xs uppercase tracking-widest text-muted-foreground">Title</label>
-        <input
-          value={title} onChange={(e) => setTitle(e.target.value)}
-          className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm"
-        />
-
-        <label className="block mt-5 text-xs uppercase tracking-widest text-muted-foreground">Template</label>
-        <div className="grid grid-cols-1 gap-2 mt-2">
-          {TEMPLATES.map((t, i) => (
-            <button
-              key={t.name}
-              onClick={() => { setTplIdx(i); setTitle(t.title); }}
-              className={`text-left rounded-lg border p-3 transition-colors ${i === tplIdx ? "border-accent bg-accent/5" : "border-border hover:bg-secondary/30"}`}
-            >
-              <p className="font-display text-base">{t.name}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {t.nodes.length} nodes · {t.nodes.reduce((s, n) => s + n.budget, 0).toFixed(2)} OG budget
-              </p>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex justify-end gap-2 mt-7">
-          <button onClick={onClose} className="btn-ghost !py-2 !px-4 text-sm">Cancel</button>
-          <button onClick={submit} className="btn-primary !py-2 !px-4 text-sm">Lock budget &amp; submit</button>
-        </div>
-      </div>
-    </div>
-  );
-}
