@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { mesh, useMesh, type NodeType } from "@/lib/sdk";
+import { useMesh } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 
 export const Route = createFileRoute("/dashboard")({
@@ -22,7 +22,19 @@ function Dashboard() {
   const dags = useMesh((s) => s.dags);
   const attestations = useMesh((s) => s.attestations);
   const block = useMesh((s) => s.block);
-  const [open, setOpen] = useState(false);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  const lastSeen = useRef<string | null>(null);
+
+  useEffect(() => {
+    const top = attestations[0];
+    if (top && top.id !== lastSeen.current) {
+      lastSeen.current = top.id;
+      setFlashId(top.id);
+      const t = setTimeout(() => setFlashId(null), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [attestations]);
+
 
   const locked = dags.reduce((s, d) => s + d.locked, 0);
   const released = dags.reduce((s, d) => s + d.released, 0);
