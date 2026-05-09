@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { mesh, useMesh, type AgentOp } from "@/lib/sdk";
+import { useMesh, type AgentOp } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
 
 export const Route = createFileRoute("/agents")({
@@ -25,7 +25,7 @@ function AgentsPage() {
   const [op, setOp] = useState<AgentOp | "All">("All");
   const [minRep, setMinRep] = useState(0);
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
+  
 
   const filtered = useMemo(() => {
     return agents.filter((a) => {
@@ -47,9 +47,11 @@ function AgentsPage() {
               Every agent has a <em className="italic text-accent">name,</em> a stake and a reputation.
             </h1>
             <div className="mt-8">
-              <button onClick={() => (address ? setOpen(true) : connect())} className="btn-primary">
-                + Register agent
-              </button>
+              {address ? (
+                <Link to="/agents/register" className="btn-primary">+ Register agent</Link>
+              ) : (
+                <button onClick={connect} className="btn-primary">Connect wallet to register</button>
+              )}
             </div>
           </div>
         </section>
@@ -117,67 +119,6 @@ function AgentsPage() {
         </section>
       </main>
       <SiteFooter />
-      {open && <RegisterDialog onClose={() => setOpen(false)} owner={address!} />}
-    </div>
-  );
-}
-
-function RegisterDialog({ onClose, owner }: { onClose: () => void; owner: string }) {
-  const [name, setName] = useState("");
-  const [op, setOp] = useState<AgentOp>("Researcher");
-  const [stake, setStake] = useState(100);
-  const [caps, setCaps] = useState("search, synthesis");
-
-  const submit = () => {
-    if (!name.trim()) return;
-    mesh.agents.register({
-      name: name.trim(),
-      op,
-      stake,
-      capabilities: caps.split(",").map((c) => c.trim()).filter(Boolean),
-      owner,
-    });
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm grid place-items-center p-4" onClick={onClose}>
-      <div className="card-soft p-8 w-full max-w-lg bg-background" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-display text-2xl">Register agent</h3>
-        <p className="text-sm text-muted-foreground mt-2">Mints an ERC-7857 INFT and locks stake into AgentRegistry.sol.</p>
-
-        <div className="grid gap-4 mt-6">
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-muted-foreground">Name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="claude-r1"
-              className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-muted-foreground">Operation</label>
-              <select value={op} onChange={(e) => setOp(e.target.value as AgentOp)}
-                className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm">
-                {OPS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs uppercase tracking-widest text-muted-foreground">Stake (OG)</label>
-              <input type="number" value={stake} onChange={(e) => setStake(Number(e.target.value))}
-                className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm font-mono" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-muted-foreground">Capabilities (comma-sep)</label>
-            <input value={caps} onChange={(e) => setCaps(e.target.value)}
-              className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm font-mono" />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-7">
-          <button onClick={onClose} className="btn-ghost !py-2 !px-4 text-sm">Cancel</button>
-          <button onClick={submit} className="btn-primary !py-2 !px-4 text-sm">Stake &amp; mint INFT</button>
-        </div>
-      </div>
     </div>
   );
 }
