@@ -176,13 +176,13 @@ function NewDagPage() {
               <Row k="Nodes" v={String(nodes.length)} />
               <Row k="Total budget" v={`${totalBudget.toFixed(2)} OG`} />
               <Row k="Owner" v={address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Not connected"} />
-              <Row k="Chain" v={isCorrectChain ? "0G Galileo" : "Wrong network"} />
+              <Row k="Chain" v={isCorrectChain ? "0G Newton Mainnet" : "Wrong network — switch to 0G"} />
             </dl>
             <div className="hairline my-5" />
             {!address ? (
               <button onClick={connect} className="btn-primary w-full">Connect wallet</button>
             ) : !isCorrectChain ? (
-              <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G</button>
+              <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G Newton Mainnet</button>
             ) : tx.status === "success" ? (
               <button onClick={goToDag} className="btn-primary w-full">Open Task DAG -&gt;</button>
             ) : (

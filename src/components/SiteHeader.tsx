@@ -1,10 +1,9 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
-import { useWallet, shortAddr } from "@/lib/wallet";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 
 const links = [
   { to: "/", label: "Overview" },
-  { to: "/protocol", label: "Protocol" },
   { to: "/agents", label: "Agents" },
   { to: "/explorer", label: "Explorer" },
   { to: "/dashboard", label: "Dashboard" },
@@ -16,7 +15,6 @@ const links = [
 export function SiteHeader() {
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
-  const { address, connect, connecting, isCorrectChain, switchToZg, disconnect } = useWallet();
 
   return (
     <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/70 border-b border-border/60">
@@ -46,22 +44,14 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {address && !isCorrectChain && (
-            <button onClick={switchToZg} className="btn-ghost !py-1.5 !px-3 text-xs hidden sm:inline-flex">
-              Switch to 0G
-            </button>
-          )}
-          {address ? (
-            <button onClick={disconnect} className="btn-ghost !py-2 !px-4 text-sm font-mono">
-              {shortAddr(address)}
-            </button>
-          ) : (
-            <button onClick={connect} disabled={connecting} className="btn-primary !py-2 !px-4 text-sm">
-              {connecting ? "Connecting..." : "Connect wallet"}
-            </button>
-          )}
+          <ConnectButton 
+            accountStatus="address"
+            showBalance={true}
+            chainStatus="icon"
+          />
+          
           <button
-            className="lg:hidden p-2 rounded-md border border-border"
+            className="lg:hidden p-2 rounded-md border border-border ml-2"
             onClick={() => setOpen(!open)}
             aria-label="Menu"
           >

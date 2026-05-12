@@ -28,9 +28,9 @@ export interface ChainAttestation {
 }
 
 export const ZG_RPC = (import.meta as { env?: Record<string, string> }).env?.VITE_ZG_RPC_URL
-  || "https://evmrpc-testnet.0g.ai";
+  || "https://evmrpc.0g.ai";
 export const ZG_EXPLORER = (import.meta as { env?: Record<string, string> }).env?.VITE_ZG_EXPLORER
-  || "https://chainscan-galileo.0g.ai";
+  || "https://chainscan.0g.ai";
 export const TEE_VERIFIER = (import.meta as { env?: Record<string, string> }).env?.VITE_TEE_VERIFIER_ADDRESS || "";
 export const TEE_TOPIC = (import.meta as { env?: Record<string, string> }).env?.VITE_TEE_ATTEST_TOPIC
   // keccak256("AttestationPosted(bytes32,bytes32,address,uint256,uint256)")

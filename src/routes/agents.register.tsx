@@ -115,7 +115,7 @@ function RegisterAgentPage() {
             <h3 className="font-display text-xl">Summary</h3>
             <dl className="mt-5 space-y-3 text-sm">
               <Row k="Owner" v={address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Not connected"} />
-              <Row k="Chain" v={isCorrectChain ? "0G Galileo" : "Wrong network"} />
+              <Row k="Chain" v={isCorrectChain ? "0G Newton Mainnet" : "Wrong network — switch to 0G"} />
               <Row k="Stake locked" v={`${stake} OG`} />
               <Row k="Capabilities" v={String(capList.length)} />
             </dl>
@@ -123,7 +123,7 @@ function RegisterAgentPage() {
             {!address ? (
               <button onClick={connect} className="btn-primary w-full">Connect wallet</button>
             ) : !isCorrectChain ? (
-              <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G</button>
+              <button onClick={switchToZg} className="btn-primary w-full">Switch to 0G Newton Mainnet</button>
             ) : tx.status === "success" ? (
               <button onClick={goToAgent} className="btn-primary w-full">Open agent profile -&gt;</button>
             ) : (

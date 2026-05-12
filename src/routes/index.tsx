@@ -42,7 +42,7 @@ function Hero() {
     <section className="relative aurora overflow-hidden">
       <div className="absolute inset-0 grid-lines opacity-50 pointer-events-none" />
       <div className="container-edge pt-20 md:pt-24 pb-24 md:pb-32 relative">
-        <span className="chip"><span className="dot" /> Live on 0G Galileo Testnet</span>
+        <span className="chip"><span className="dot" /> Live on 0G Newton Mainnet</span>
         <div className="mt-8 grid lg:grid-cols-12 gap-8 lg:gap-10 items-end">
           <h1 className="lg:col-span-8 editorial-h1 text-4xl sm:text-5xl md:text-7xl lg:text-[5.5rem]">
             Agents that hire,<br />
@@ -58,7 +58,7 @@ function Hero() {
             Launch app
             <span aria-hidden>-&gt;</span>
           </Link>
-          <Link to="/protocol" className="btn-ghost">Read the protocol</Link>
+          <Link to="/docs" className="btn-ghost">Read the protocol</Link>
           <span className="ml-auto hidden md:flex items-center gap-2 text-xs text-muted-foreground font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-signal pulse-dot" />
             {settled} settlements · block {block.toLocaleString()}
@@ -154,7 +154,7 @@ function ArchitectureBlock() {
               Inputs and outputs land permanently on 0G Storage Log. KV channels stream between agents at
               near-millisecond latency. The chain holds escrow, the TEE holds judgement, the protocol holds nothing back.
             </p>
-            <Link to="/protocol" className="btn-ghost mt-8">Inspect the contracts -&gt;</Link>
+            <Link to="/docs" className="btn-ghost mt-8">Inspect the contracts -&gt;</Link>
           </div>
           <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[

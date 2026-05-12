@@ -173,10 +173,10 @@ Task Economy                       Evolution Lab
                 single <i>Switch to 0G</i> call using <code>wallet_switchEthereumChain</code> with an
                 <code> wallet_addEthereumChain</code> fallback.
               </p>
-              <pre className="block-code">{`Chain:    0G Galileo Testnet
-ChainId:  0x40D9 (16601)
-RPC:      https://evmrpc-testnet.0g.ai
-Explorer: https://chainscan-galileo.0g.ai`}</pre>
+              <pre className="block-code">{`Chain:    0G Newton Mainnet
+ChainId:  0x40D8 (16600)
+RPC:      https://evmrpc.0g.ai
+Explorer: https://chainscan.0g.ai`}</pre>
             </Section>
 
             <Section id="tx" title="Transaction lifecycle">
@@ -225,14 +225,15 @@ mesh.on("attestation", (a) => console.log(a.agent, a.score, a.payout));`}</pre>
                 <li><Link to="/agents/register" className="link-mesh">Register Agent</Link> - stake OG and mint an ERC-7857 INFT.</li>
                 <li><Link to="/dags/new" className="link-mesh">Submit DAG</Link> - compose nodes, dependencies and budgets, then submit.</li>
                 <li><Link to="/settlements" className="link-mesh">Settlements</Link> - filtered escrow releases with CSV export.</li>
-                <li><Link to="/protocol" className="link-mesh">Protocol</Link> - contract topology and data structures.</li>
+                <li><Link to="/docs" className="link-mesh">Protocol</Link> - contract topology and data structures.</li>
               </ul>
             </Section>
 
             <Section id="env" title="Configuration">
               <p>Provide these Vite env vars to enable the live chain stream:</p>
-              <pre className="block-code">{`VITE_ZG_RPC_URL=https://evmrpc-testnet.0g.ai
-VITE_ZG_EXPLORER=https://chainscan-galileo.0g.ai
+              <pre className="block-code">{`VITE_ZG_RPC_URL=https://evmrpc.0g.ai
+VITE_ZG_EXPLORER=https://chainscan.0g.ai
+VITE_WALLETCONNECT_PROJECT_ID=<from cloud.walletconnect.com>
 VITE_TEE_VERIFIER_ADDRESS=0x...     # required for live feed
 VITE_TEE_ATTEST_TOPIC=0x...         # optional override`}</pre>
               <p>Without <code>VITE_TEE_VERIFIER_ADDRESS</code> the feed reports <i>not configured</i> and stays empty rather than rendering placeholder data.</p>

@@ -7,9 +7,12 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { WagmiProvider } from "wagmi";
+import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 
 import appCss from "../styles.css?url";
-import { WalletProvider } from "@/lib/wallet";
+import rainbowCss from "@rainbow-me/rainbowkit/styles.css?url";
+import { wagmiConfig } from "@/lib/wagmi";
 
 function NotFoundComponent() {
   return (
@@ -80,17 +83,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@SynapseMesh" },
       { name: "twitter:title", content: "SynapseMesh - Trustless Task Economy for Autonomous Agents" },
       { name: "twitter:description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
       { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/4208562c-1895-4210-a48a-f11a6b0e6e63" },
       { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/4208562c-1895-4210-a48a-f11a6b0e6e63" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: rainbowCss },
+      { rel: "stylesheet", href: appCss },
     ],
   }),
   shellComponent: RootShell,
@@ -117,10 +118,20 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <WalletProvider>
-        <Outlet />
-      </WalletProvider>
-    </QueryClientProvider>
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <RainbowKitProvider
+          theme={darkTheme({
+            accentColor: "oklch(0.78 0.16 65)",       // matches --accent
+            accentColorForeground: "oklch(0.16 0.02 250)",
+            borderRadius: "large",
+            fontStack: "system",
+          })}
+          showRecentTransactions={false}
+        >
+          <Outlet />
+        </RainbowKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }

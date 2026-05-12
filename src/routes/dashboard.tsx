@@ -21,35 +21,22 @@ export const Route = createFileRoute("/dashboard")({
 function Dashboard() {
   const { address, connect } = useWallet();
   const dags = useMesh((s) => s.dags);
+  const agents = useMesh((s) => s.agents);
   const block = useMesh((s) => s.block);
-  const stream = useChainAttestations(20);
-  const attestations = stream.attestations;
-  const [flashId, setFlashId] = useState<string | null>(null);
-  const lastSeen = useRef<string | null>(null);
 
-  useEffect(() => {
-    const top = attestations[0];
-    if (top && top.id !== lastSeen.current) {
-      lastSeen.current = top.id;
-      setFlashId(top.id);
-      const t = setTimeout(() => setFlashId(null), 1800);
-      return () => clearTimeout(t);
-    }
-  }, [attestations]);
-
-
-  const locked = dags.reduce((s, d) => s + d.locked, 0);
-  const released = dags.reduce((s, d) => s + d.released, 0);
-  const executing = dags.filter((d) => d.status === "Executing" || d.status === "Bidding").length;
-  const passRate = attestations.length
-    ? (attestations.filter((a) => a.score >= 80).length / attestations.length * 100).toFixed(2) + "%"
-    : "-";
+  // Individual filtering
+  const myDags = address ? dags.filter(d => d.owner.toLowerCase() === address.toLowerCase()) : [];
+  const myAgents = address ? agents.filter(a => a.owner.toLowerCase() === address.toLowerCase()) : [];
+  
+  const locked = myDags.reduce((s, d) => s + d.locked, 0);
+  const released = myDags.reduce((s, d) => s + d.released, 0);
+  const executing = myDags.filter((d) => d.status === "Executing" || d.status === "Bidding").length;
 
   const stats = [
-    { l: "Locked in escrow", v: `${locked.toFixed(2)} OG` },
-    { l: "Released", v: `${released.toFixed(2)} OG` },
-    { l: "Active DAGs", v: String(executing) },
-    { l: "TEE pass rate", v: passRate },
+    { l: "My Locked OG", v: `${locked.toFixed(2)} OG` },
+    { l: "My Released OG", v: `${released.toFixed(2)} OG` },
+    { l: "My Active DAGs", v: String(executing) },
+    { l: "My Agents", v: String(myAgents.length) },
   ];
 
   return (
@@ -59,13 +46,16 @@ function Dashboard() {
         <section className="container-edge pt-12 pb-8 border-b border-border/60">
           <div className="flex items-end justify-between flex-wrap gap-4">
             <div>
-              <span className="chip"><span className="dot pulse-dot" /> Synced · block {block.toLocaleString()}</span>
-              <h1 className="editorial-h1 text-4xl md:text-5xl mt-4">Network dashboard</h1>
+              <span className="chip"><span className="dot pulse-dot" /> Connected · block {block.toLocaleString()}</span>
+              <h1 className="editorial-h1 text-4xl md:text-5xl mt-4">Personal Dashboard</h1>
             </div>
             {address ? (
-              <Link to="/dags/new" className="btn-primary">+ New Task DAG</Link>
+              <div className="flex gap-2">
+                <Link to="/agents/register" className="btn-ghost">Register Agent</Link>
+                <Link to="/dags/new" className="btn-primary">+ New Task DAG</Link>
+              </div>
             ) : (
-              <button className="btn-primary" onClick={connect}>Connect to submit</button>
+              <button className="btn-primary" onClick={connect}>Connect Wallet</button>
             )}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
@@ -78,17 +68,21 @@ function Dashboard() {
           </div>
         </section>
 
-        <section className="container-edge py-12 grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 card-soft p-6">
+        <section className="container-edge py-12 grid lg:grid-cols-2 gap-6">
+          <div className="card-soft p-6">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="font-display text-2xl">Task DAGs</h2>
-              <Link to="/explorer" className="text-xs text-muted-foreground hover:text-accent">Open explorer -&gt;</Link>
+              <h2 className="font-display text-2xl">My Task DAGs</h2>
+              <Link to="/explorer" className="text-xs text-muted-foreground hover:text-accent">View all -&gt;</Link>
             </div>
-            {dags.length === 0 ? (
+            {!address ? (
+              <div className="py-10 text-center border border-dashed border-border rounded-xl">
+                 <p className="text-sm text-muted-foreground">Connect wallet to see your DAGs</p>
+              </div>
+            ) : myDags.length === 0 ? (
               <EmptyDags hasWallet={!!address} onConnect={connect} />
             ) : (
               <ul className="divide-y divide-border/60">
-                {dags.slice(0, 8).map((t) => (
+                {myDags.map((t) => (
                   <li key={t.id}>
                     <Link to="/explorer/$dagId" params={{ dagId: t.id }} className="py-4 flex items-center gap-4 hover:bg-secondary/30 -mx-2 px-2 rounded-lg">
                       <div className="flex-1 min-w-0">
@@ -107,47 +101,38 @@ function Dashboard() {
           </div>
 
           <div className="card-soft p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-2xl">Live TEE feed</h2>
-              <StreamPill status={stream.status} />
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-2xl">My Registered Agents</h2>
+              <Link to="/agents" className="text-xs text-muted-foreground hover:text-accent">Registry -&gt;</Link>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1 font-mono truncate">
-              {TEE_VERIFIER ? `verifier ${TEE_VERIFIER.slice(0, 10)}…` : "verifier contract not configured"}
-              {stream.cursorBlock !== null && ` · cursor ${stream.cursorBlock.toLocaleString()}`}
-            </p>
-            {attestations.length === 0 ? (
-              <p className="mt-6 text-sm text-muted-foreground">
-                {stream.status === "unconfigured"
-                  ? "Set VITE_TEE_VERIFIER_ADDRESS to stream live AttestationPosted events from 0G Chain."
-                  : stream.status === "error"
-                  ? `Reconnecting to RPC... ${stream.error ?? ""}`
-                  : "Listening for new TEE attestations on 0G Chain."}
-              </p>
+            {!address ? (
+               <div className="py-10 text-center border border-dashed border-border rounded-xl">
+                 <p className="text-sm text-muted-foreground">Connect wallet to see your agents</p>
+               </div>
+            ) : myAgents.length === 0 ? (
+              <div className="py-14 text-center">
+                <p className="font-display text-xl text-muted-foreground">No agents registered</p>
+                <Link to="/agents/register" className="btn-ghost mt-4 inline-block">Register your first agent</Link>
+              </div>
             ) : (
-              <ul className="mt-5 space-y-3">
-                {attestations.slice(0, 10).map((a) => (
-                  <li
-                    key={a.id}
-                    className={`flex items-center justify-between text-sm p-2 -mx-2 rounded-lg transition-colors ${flashId === a.id ? "bg-signal/10 ring-1 ring-signal/40" : ""}`}
-                  >
-                    <div className="min-w-0">
-                      <a href={explorerAddr(a.agent)} target="_blank" rel="noreferrer"
-                         className="font-mono truncate hover:text-accent block">
-                        {a.agent.slice(0, 6)}…{a.agent.slice(-4)}
-                      </a>
-                      <a href={explorerTx(a.txHash)} target="_blank" rel="noreferrer"
-                         className="text-[11px] text-muted-foreground font-mono truncate hover:text-accent block">
-                        {a.txHash.slice(0, 10)}…
-                      </a>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">+{a.payout.toFixed(4)} OG · block {a.blockNumber.toLocaleString()}</p>
-                    </div>
-                    <span className="font-display text-2xl text-signal">{a.score}</span>
+              <ul className="divide-y divide-border/60">
+                {myAgents.map((a) => (
+                  <li key={a.id}>
+                    <Link to="/agents/$agentId" params={{ agentId: a.id }} className="py-4 flex items-center gap-4 hover:bg-secondary/30 -mx-2 px-2 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display text-lg truncate">{a.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 uppercase tracking-wider">{a.op} · Stake: {a.stake} OG</p>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div className="w-10 h-10 rounded-full border border-border/60 grid place-items-center font-mono text-xs ml-auto">
+                          {a.reputation}
+                        </div>
+                      </div>
+                    </Link>
                   </li>
                 ))}
               </ul>
             )}
-            <div className="hairline my-4" />
-            <Link to="/settlements" className="text-xs text-muted-foreground hover:text-accent">All settlements -&gt;</Link>
           </div>
         </section>
       </main>
