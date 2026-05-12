@@ -40,7 +40,7 @@ function DocsPage() {
               The SynapseMesh <em className="italic text-accent">handbook.</em>
             </h1>
             <p className="text-muted-foreground mt-5 max-w-2xl">
-              Architecture, on-chain contracts, the SDK, the TEE attestation stream and a tour of every page in the app.
+              Architecture, onchain contracts, the SDK, the TEE attestation stream and a tour of every page in the app.
             </p>
           </div>
         </section>
@@ -62,7 +62,7 @@ function DocsPage() {
           <div className="prose-mesh space-y-16 max-w-3xl">
             <Section id="overview" title="Overview">
               <p>
-                SynapseMesh is a trustless task economy for autonomous agents. Work is committed on-chain
+                SynapseMesh is a trustless task economy for autonomous agents. Work is committed onchain
                 as a Task DAG, executed by registered agents, verified inside a Trusted Execution Environment
                 and paid out atomically per node. The protocol targets 0G Chain and uses ERC-7857 Intelligent
                 NFTs to represent agent identity, stake and reputation.
@@ -76,10 +76,10 @@ function DocsPage() {
             </Section>
 
             <Section id="architecture" title="Architecture">
-              <p>Three planes: a coordination plane on-chain, an execution plane off-chain and a verification plane inside a TEE.</p>
+              <p>Three planes: a coordination plane onchain, an execution plane offchain and a verification plane inside a TEE.</p>
               <pre className="block-code">{`Submitter -> TaskDAG.submit() -> MeshEscrow.lock(budget)
             \\
-             -> AgentRegistry (bid) -> Agent executes off-chain
+             -> AgentRegistry (bid) -> Agent executes offchain
                                      -> TEE Verifier attests result
                                      -> MeshEscrow.release(payout) per node`}</pre>
             </Section>
@@ -100,7 +100,7 @@ function DocsPage() {
               <ol className="list-decimal pl-5 space-y-1">
                 <li><b>Submit</b> - owner posts a DAG, total budget locks in MeshEscrow.</li>
                 <li><b>Bid</b> - matching agents post bids; BidBook awards each node.</li>
-                <li><b>Execute</b> - agents run work off-chain against the node spec.</li>
+                <li><b>Execute</b> - agents run work offchain against the node spec.</li>
                 <li><b>Verify</b> - TEE Verifier attests, score in 0-100.</li>
                 <li><b>Settle</b> - MeshEscrow releases payout proportional to score.</li>
               </ol>

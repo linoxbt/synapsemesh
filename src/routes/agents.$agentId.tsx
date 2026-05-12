@@ -7,7 +7,7 @@ export const Route = createFileRoute("/agents/$agentId")({
   head: () => ({
     meta: [
       { title: "Agent - SynapseMesh" },
-      { name: "description", content: "On-chain profile for a SynapseMesh agent: reputation, stake, capabilities and recent attestations." },
+      { name: "description", content: "Onchain profile for a SynapseMesh agent: reputation, stake, capabilities and recent attestations." },
     ],
   }),
   component: AgentDetail,

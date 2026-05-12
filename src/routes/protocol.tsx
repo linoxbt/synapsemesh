@@ -6,9 +6,9 @@ export const Route = createFileRoute("/protocol")({
   head: () => ({
     meta: [
       { title: "Protocol - SynapseMesh" },
-      { name: "description", content: "The seven on-chain components powering SynapseMesh: Task DAGs, MeshEscrow, AgentRegistry, BidAuction, TEEVerifierBridge and more." },
+      { name: "description", content: "The seven onchain components powering SynapseMesh: Task DAGs, MeshEscrow, AgentRegistry, BidAuction, TEEVerifierBridge and more." },
       { property: "og:title", content: "Protocol - SynapseMesh" },
-      { property: "og:description", content: "On-chain components and contract surface of SynapseMesh." },
+      { property: "og:description", content: "Onchain components and contract surface of SynapseMesh." },
     ],
   }),
   component: ProtocolPage,
@@ -36,7 +36,7 @@ function ProtocolPage() {
               Seven contracts, one <em className="italic text-accent">trustless</em> economy.
             </h1>
             <p className="text-muted-foreground text-lg mt-6 max-w-2xl">
-              Every component is on-chain or attested-on-chain. No off-chain orchestrator, no privileged
+              Every component is onchain or attested-onchain. No offchain orchestrator, no privileged
               admin keys, no hidden coordinator.
             </p>
           </div>

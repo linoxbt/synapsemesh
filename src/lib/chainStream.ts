@@ -1,4 +1,4 @@
-// Real on-chain TEE attestation streamer.
+// Real onchain TEE attestation streamer.
 // Polls eth_getLogs against the configured 0G Chain RPC for AttestationPosted
 // events emitted by the TEE Verifier contract. Includes:
 //   - Last-seen block cursor (persisted to localStorage)

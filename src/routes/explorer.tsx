@@ -36,7 +36,7 @@ function ExplorerPage() {
               Every DAG, every node, <em className="italic text-accent">verifiable.</em>
             </h1>
             <p className="text-muted-foreground mt-6 max-w-xl">
-              Each Task DAG is committed on-chain via TaskDAG.sol. Click any DAG to see its graph, per-node TEE attestations and atomic settlement trail.
+              Each Task DAG is committed onchain via TaskDAG.sol. Click any DAG to see its graph, per-node TEE attestations and atomic settlement trail.
             </p>
           </div>
         </section>

@@ -1,9 +1,9 @@
 // Transaction lifecycle helper for wallet-driven actions.
 // Wraps any async submit fn and exposes pending/success/failure states +
-// resulting on-chain tx hash + explorer link. Intended for SDK calls that
+// resulting onchain tx hash + explorer link. Intended for SDK calls that
 // either return a tx hash directly or that we polyfill (local SDK shim) by
 // requesting an `eth_sendTransaction` to the configured contract address so
-// users still get a real on-chain tx receipt for their action.
+// users still get a real onchain tx receipt for their action.
 
 import { useCallback, useState } from "react";
 import { explorerTx, ZG_EXPLORER } from "./chainStream";

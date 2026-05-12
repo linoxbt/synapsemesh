@@ -1,4 +1,4 @@
-// Local @synapsemesh/sdk shim. Mirrors the on-chain contract surface so the UI
+// Local @synapsemesh/sdk shim. Mirrors the onchain contract surface so the UI
 // is fully wired and ready to swap to deployed 0G Chain contracts later.
 // State is held in-memory + persisted to localStorage so the user can submit
 // DAGs / register agents / observe TEE attestations end-to-end from the UI.

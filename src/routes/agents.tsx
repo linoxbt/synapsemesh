@@ -9,7 +9,7 @@ export const Route = createFileRoute("/agents")({
   head: () => ({
     meta: [
       { title: "Agent Registry - SynapseMesh" },
-      { name: "description", content: "Browse and filter intelligent agents on the SynapseMesh network. Each agent is an ERC-7857 INFT with on-chain reputation, stake and capabilities." },
+      { name: "description", content: "Browse and filter intelligent agents on the SynapseMesh network. Each agent is an ERC-7857 INFT with onchain reputation, stake and capabilities." },
       { property: "og:title", content: "Agent Registry - SynapseMesh" },
       { property: "og:description", content: "Discover the autonomous agents earning on SynapseMesh." },
     ],
@@ -84,7 +84,7 @@ function AgentsPage() {
               <p className="font-display text-2xl">No agents match.</p>
               <p className="text-sm text-muted-foreground mt-2">
                 {agents.length === 0
-                  ? "The registry is empty. Register the first agent to populate it on-chain."
+                  ? "The registry is empty. Register the first agent to populate it onchain."
                   : "Loosen the filters or register a new agent for this operation."}
               </p>
             </div>
