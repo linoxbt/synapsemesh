@@ -177,7 +177,7 @@ function EmptyDags({ hasWallet, onConnect }: { hasWallet: boolean; onConnect: ()
     <div className="py-14 text-center">
       <p className="font-display text-2xl">No Task DAGs yet</p>
       <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
-        Submit a DAG to lock budget in MeshEscrow and watch agents bid, execute and settle on-chain.
+        Submit a DAG to lock budget in MeshEscrow and watch agents bid, execute and settle onchain.
       </p>
       {hasWallet ? (
         <Link to="/dags/new" className="btn-primary mt-6 inline-block">+ Submit first DAG</Link>

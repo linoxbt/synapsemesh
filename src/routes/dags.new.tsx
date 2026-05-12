@@ -11,7 +11,7 @@ export const Route = createFileRoute("/dags/new")({
   head: () => ({
     meta: [
       { title: "Submit Task DAG - SynapseMesh" },
-      { name: "description", content: "Compose a Task DAG and submit it on-chain via the wallet-connected SDK on 0G Chain." },
+      { name: "description", content: "Compose a Task DAG and submit it onchain via the wallet-connected SDK on 0G Chain." },
       { property: "og:title", content: "Submit Task DAG - SynapseMesh" },
       { property: "og:description", content: "Lock budget into MeshEscrow.sol and let agents bid, execute and settle." },
     ],
@@ -81,7 +81,7 @@ function NewDagPage() {
           <div className="container-edge pt-20 pb-10">
             <span className="chip">Compose</span>
             <h1 className="editorial-h1 text-4xl md:text-6xl mt-6 max-w-3xl">
-              Submit a Task DAG <em className="italic text-accent">on-chain.</em>
+              Submit a Task DAG <em className="italic text-accent">onchain.</em>
             </h1>
             <p className="text-muted-foreground mt-5 max-w-xl text-sm">
               Define each node, its budget and dependencies. Submitting calls TaskDAG.submit() and locks total budget in MeshEscrow.sol via the wallet-connected SDK.
@@ -196,7 +196,7 @@ function NewDagPage() {
                   : `Lock ${totalBudget.toFixed(2)} OG & submit`}
               </button>
             )}
-            <TxStatusPanel tx={tx} labels={{ pending: "Locking budget in MeshEscrow", success: "Task DAG submitted on-chain" }} />
+            <TxStatusPanel tx={tx} labels={{ pending: "Locking budget in MeshEscrow", success: "Task DAG submitted onchain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
               Calls TaskDAG.submit() then MeshEscrow.lock() in a single tx.
             </p>

@@ -8,9 +8,9 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "SynapseMesh - The Trustless Task Economy for Autonomous Agents" },
-      { name: "description", content: "On-chain Task DAGs, TEE-verified work, atomic agent-to-agent settlement. The neutral coordination layer for autonomous AI on 0G Chain." },
+      { name: "description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement. The neutral coordination layer for autonomous AI on 0G Chain." },
       { property: "og:title", content: "SynapseMesh - The Trustless Task Economy for Autonomous Agents" },
-      { property: "og:description", content: "On-chain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
+      { property: "og:description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
     ],
   }),
   component: HomePage,
@@ -50,7 +50,7 @@ function Hero() {
           </h1>
           <p className="lg:col-span-4 text-base md:text-lg text-muted-foreground leading-relaxed max-w-md">
             SynapseMesh is the neutral coordination layer for autonomous AI. Task DAGs committed
-            on-chain, work judged inside TEEs, settlement atomic to the cent.
+            onchain, work judged inside TEEs, settlement atomic to the cent.
           </p>
         </div>
         <div className="mt-10 md:mt-12 flex flex-wrap items-center gap-3">
@@ -70,7 +70,7 @@ function Hero() {
             <DAGDiagram />
           </div>
           <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-            <Tile label="On-chain DAGs" value="commit, execute, verify" tone="warm" />
+            <Tile label="Onchain DAGs" value="commit, execute, verify" tone="warm" />
             <Tile label="ERC-7857" value="Intelligent NFT identity" />
             <Tile label="0G Storage KV" value="agent-to-agent stream" />
             <Tile label="TEE Judge" value="quality, not vibes" tone="mesh" />
@@ -109,7 +109,7 @@ function Marquee() {
 
 function Pillars() {
   const items = [
-    { n: "01", t: "Cryptographic Task DAG", d: "A graph of typed sub-tasks committed on-chain. Topological sort, cycle detection and per-node escrow, all enforced before a single token unlocks." },
+    { n: "01", t: "Cryptographic Task DAG", d: "A graph of typed sub-tasks committed onchain. Topological sort, cycle detection and per-node escrow, all enforced before a single token unlocks." },
     { n: "02", t: "Reputation-weighted bidding", d: "Agents stake to bid. The contract ranks bids by price, reputation and ETA. Slashing on failure, multi-node pipelines for lower latency." },
     { n: "03", t: "TEE Work Verifier", d: "A neutral judge runs inside 0G Compute's TEE, scoring deliverables against the rubric and emitting an attestation that releases payment." },
     { n: "04", t: "Atomic micro-settlement", d: "Funds release per node, sub-cent granularity. The DAG pays itself as it executes, no human approves anything." },
@@ -188,7 +188,7 @@ function NumbersBlock() {
     { v: dags.length.toString(), l: "Task DAGs submitted" },
     { v: agents.length.toString(), l: "Registered agents" },
     { v: attestations.length.toString(), l: "TEE attestations" },
-    { v: `${released.toFixed(2)} OG`, l: "Released on-chain" },
+    { v: `${released.toFixed(2)} OG`, l: "Released onchain" },
   ];
   return (
     <section className="container-edge py-16 md:py-20">
