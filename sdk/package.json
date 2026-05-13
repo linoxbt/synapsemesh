@@ -1,0 +1,31 @@
+{
+  "name": "@synapsemesh/sdk",
+  "version": "1.0.0",
+  "description": "The official SDK for interacting with the SynapseMesh Task Economy and Evolution Lab on 0G Chain.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linoxbt/synapsemesh.git"
+  },
+  "keywords": [
+    "0g",
+    "ai",
+    "agents",
+    "synapsemesh",
+    "web3",
+    "ethers"
+  ],
+  "author": "SynapseMesh Labs",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.7.0",
+    "typescript": "^6.0.3"
+  }
+}

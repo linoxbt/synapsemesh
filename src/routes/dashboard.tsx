@@ -1,10 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { useMesh } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { useChainAttestations, explorerTx, explorerAddr, TEE_VERIFIER } from "@/lib/chainStream";
+import { useLiveDAGs, useLiveAgents } from "@/lib/onchain";
+import { useBlockNumber } from "wagmi";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -20,17 +19,18 @@ export const Route = createFileRoute("/dashboard")({
 
 function Dashboard() {
   const { address, connect } = useWallet();
-  const dags = useMesh((s) => s.dags);
-  const agents = useMesh((s) => s.agents);
-  const block = useMesh((s) => s.block);
+  const { data: dags = [] } = useLiveDAGs();
+  const { data: agents = [] } = useLiveAgents();
+  const { data: blockNumber } = useBlockNumber({ watch: true });
 
   // Individual filtering
   const myDags = address ? dags.filter(d => d.owner.toLowerCase() === address.toLowerCase()) : [];
   const myAgents = address ? agents.filter(a => a.owner.toLowerCase() === address.toLowerCase()) : [];
   
-  const locked = myDags.reduce((s, d) => s + d.locked, 0);
-  const released = myDags.reduce((s, d) => s + d.released, 0);
-  const executing = myDags.filter((d) => d.status === "Executing" || d.status === "Bidding").length;
+  // Calculate stats based on LiveDAG type
+  const locked = myDags.filter(d => !d.complete).reduce((s, d) => s + Number(d.totalBudget), 0);
+  const released = myDags.filter(d => d.complete).reduce((s, d) => s + Number(d.totalBudget), 0);
+  const executing = myDags.filter((d) => !d.complete).length;
 
   const stats = [
     { l: "My Locked OG", v: `${locked.toFixed(2)} OG` },
@@ -46,7 +46,7 @@ function Dashboard() {
         <section className="container-edge pt-12 pb-8 border-b border-border/60">
           <div className="flex items-end justify-between flex-wrap gap-4">
             <div>
-              <span className="chip"><span className="dot pulse-dot" /> Connected · block {block.toLocaleString()}</span>
+              <span className="chip"><span className="dot pulse-dot" /> Connected · block {blockNumber?.toString() || "..."}</span>
               <h1 className="editorial-h1 text-4xl md:text-5xl mt-4">Personal Dashboard</h1>
             </div>
             {address ? (
@@ -87,11 +87,13 @@ function Dashboard() {
                     <Link to="/explorer/$dagId" params={{ dagId: t.id }} className="py-4 flex items-center gap-4 hover:bg-secondary/30 -mx-2 px-2 rounded-lg">
                       <div className="flex-1 min-w-0">
                         <p className="font-display text-lg truncate">{t.title}</p>
-                        <p className="font-mono text-xs text-muted-foreground mt-0.5">{t.id} · {t.nodes.length} nodes</p>
+                        <p className="font-mono text-[10px] text-muted-foreground mt-0.5 truncate">{t.id}</p>
                       </div>
                       <div className="text-right text-sm">
-                        <p className="font-mono">{t.locked.toFixed(2)} OG</p>
-                        <StatusPill s={t.status} />
+                        <p className="font-mono">{Number(t.totalBudget).toFixed(2)} OG</p>
+                        <span className={`inline-block mt-1 text-[10px] uppercase tracking-widest border rounded-full px-2 py-0.5 ${t.complete ? 'border-signal text-signal bg-signal/10' : 'border-accent text-accent bg-accent/10'}`}>
+                          {t.complete ? 'Completed' : 'Active'}
+                        </span>
                       </div>
                     </Link>
                   </li>
@@ -121,7 +123,7 @@ function Dashboard() {
                     <Link to="/agents/$agentId" params={{ agentId: a.id }} className="py-4 flex items-center gap-4 hover:bg-secondary/30 -mx-2 px-2 rounded-lg">
                       <div className="flex-1 min-w-0">
                         <p className="font-display text-lg truncate">{a.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 uppercase tracking-wider">{a.op} · Stake: {a.stake} OG</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">{a.op} · Stake: {Number(a.stake).toFixed(2)} OG</p>
                       </div>
                       <div className="text-right text-sm">
                         <div className="w-10 h-10 rounded-full border border-border/60 grid place-items-center font-mono text-xs ml-auto">
@@ -141,22 +143,6 @@ function Dashboard() {
   );
 }
 
-function StreamPill({ status }: { status: string }) {
-  const tone = status === "live" ? "text-signal border-signal/40"
-    : status === "error" ? "text-destructive border-destructive/40"
-    : status === "unconfigured" ? "text-muted-foreground border-border"
-    : "text-accent border-accent/40";
-  const label = status === "live" ? "live"
-    : status === "error" ? "reconnecting"
-    : status === "unconfigured" ? "not configured"
-    : "connecting";
-  return (
-    <span className={`chip text-[10px] ${tone}`}>
-      <span className={`dot ${status === "live" ? "pulse-dot" : ""}`} /> {label}
-    </span>
-  );
-}
-
 function EmptyDags({ hasWallet, onConnect }: { hasWallet: boolean; onConnect: () => void }) {
   return (
     <div className="py-14 text-center">
@@ -171,16 +157,5 @@ function EmptyDags({ hasWallet, onConnect }: { hasWallet: boolean; onConnect: ()
       )}
     </div>
   );
-}
-
-export function StatusPill({ s }: { s: string }) {
-  const tone =
-    s === "Executing" ? "text-mesh border-mesh/40"
-    : s === "Settled" ? "text-signal border-signal/40"
-    : s === "Bidding" ? "text-accent border-accent/40"
-    : s === "AwaitingVerify" ? "text-primary border-primary/40"
-    : s === "Failed" ? "text-destructive border-destructive/40"
-    : "text-muted-foreground border-border";
-  return <span className={`inline-block mt-1 text-[10px] uppercase tracking-widest border rounded-full px-2 py-0.5 ${tone}`}>{s}</span>;
 }
 

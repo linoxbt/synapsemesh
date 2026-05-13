@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
-import { useMesh } from "@/lib/sdk";
+import { useLiveAgents, useAgentAttestations } from "@/lib/onchain";
 
 export const Route = createFileRoute("/agents/$agentId")({
   head: () => ({
@@ -35,11 +35,13 @@ export const Route = createFileRoute("/agents/$agentId")({
 
 function AgentDetail() {
   const { agentId } = Route.useParams();
-  const agents = useMesh((s) => s.agents);
-  const attestations = useMesh((s) => s.attestations);
-  const agent = agents.find((a) => a.id === agentId || a.name === agentId);
-  if (!agent) throw notFound();
-  const recent = attestations.filter((a) => a.agentName === agent.name).slice(0, 20);
+  
+  const { data: agents = [], isLoading: isLoadingAgents } = useLiveAgents();
+  const agent = agents.find((a) => a.id.toLowerCase() === agentId.toLowerCase() || a.name === agentId);
+  
+  const { data: recent = [], isLoading: isLoadingAttest } = useAgentAttestations(agent?.id || "");
+
+  if (!agent && !isLoadingAgents && agents.length > 0) throw notFound();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -50,49 +52,50 @@ function AgentDetail() {
             <Link to="/agents" className="text-xs text-muted-foreground hover:text-accent">&larr; Registry</Link>
             <div className="flex items-end justify-between flex-wrap gap-6 mt-4">
               <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">{agent.op}</p>
-                <h1 className="editorial-h1 text-5xl md:text-6xl mt-2">{agent.name}</h1>
-                <p className="font-mono text-xs text-muted-foreground mt-3">INFT {agent.id} · owner {agent.owner.slice(0,6)}…{agent.owner.slice(-4)}</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">{agent?.op || "..."}</p>
+                <h1 className="editorial-h1 text-5xl md:text-6xl mt-2">{agent?.name || "Loading..."}</h1>
+                <p className="font-mono text-[10px] text-muted-foreground mt-3">INFT {agent?.id} · owner {agent?.owner.slice(0,6)}…{agent?.owner.slice(-4)}</p>
               </div>
               <div className="grid grid-cols-3 gap-px bg-border rounded-2xl overflow-hidden text-center">
-                <Stat l="Reputation" v={String(agent.reputation)} />
-                <Stat l="Stake" v={`${agent.stake} OG`} />
-                <Stat l="Earned" v={`${agent.earned.toFixed(2)} OG`} />
+                <Stat l="Reputation" v={String(agent?.reputation || 0)} />
+                <Stat l="Stake" v={`${Number(agent?.stake || 0).toFixed(2)} OG`} />
+                <Stat l="Earned" v={`${Number(agent?.earned || 0).toFixed(2)} OG`} />
               </div>
             </div>
           </div>
         </section>
 
         <section className="container-edge py-12 grid lg:grid-cols-3 gap-6">
-          <div className="card-soft p-6">
-            <h2 className="font-display text-xl">Capabilities</h2>
-            <div className="flex flex-wrap gap-2 mt-4">
-              {agent.capabilities.map((c) => (
-                <span key={c} className="text-xs font-mono px-2.5 py-1 rounded-full border border-border/60">{c}</span>
-              ))}
-            </div>
-            <h2 className="font-display text-xl mt-8">Lifetime</h2>
-            <dl className="grid grid-cols-2 gap-4 mt-4 text-sm">
-              <div><dt className="text-muted-foreground text-xs">Jobs completed</dt><dd className="font-mono mt-1">{agent.jobs}</dd></div>
-              <div><dt className="text-muted-foreground text-xs">Registered</dt><dd className="font-mono mt-1">{new Date(agent.registeredAt).toLocaleDateString()}</dd></div>
+          <div className="card-soft p-6 h-fit">
+            <h2 className="font-display text-xl">Onchain Status</h2>
+            <dl className="grid grid-cols-2 gap-4 mt-6 text-sm">
+              <div><dt className="text-muted-foreground text-xs">Jobs completed</dt><dd className="font-mono mt-1 text-lg">{agent?.jobs || 0}</dd></div>
+              <div><dt className="text-muted-foreground text-xs">Registry Status</dt><dd className="font-mono mt-1 text-signal text-lg">Active</dd></div>
             </dl>
+            <p className="text-xs text-muted-foreground mt-8 leading-relaxed">
+              This agent is an ERC-7857 INFT. Its reputation and metadata are cryptographically tied to its wallet address.
+            </p>
           </div>
 
           <div className="lg:col-span-2 card-soft p-6">
-            <h2 className="font-display text-xl">Recent TEE attestations</h2>
+            <div className="flex justify-between items-end mb-4">
+               <h2 className="font-display text-xl">Recent TEE attestations</h2>
+               {isLoadingAttest && <div className="animate-spin w-4 h-4 border-2 border-accent border-t-transparent rounded-full" />}
+            </div>
+            
             {recent.length === 0 ? (
               <p className="text-sm text-muted-foreground mt-6">No attestations yet. This agent has not been picked up by a Task DAG bid.</p>
             ) : (
               <ul className="mt-4 divide-y divide-border/60">
                 {recent.map((a) => (
-                  <li key={a.id} className="py-3 flex items-center justify-between text-sm">
+                  <li key={a.taskId} className="py-3 flex items-center justify-between text-sm hover:bg-secondary/30 -mx-2 px-2 rounded-lg transition-colors">
                     <div className="min-w-0">
-                      <Link to="/explorer/$dagId" params={{ dagId: a.dagId }} className="font-mono text-xs hover:text-accent">{a.dagId}/{a.nodeId}</Link>
-                      <p className="text-xs text-muted-foreground mt-0.5">{new Date(a.timestamp).toLocaleTimeString()} · {a.teeImage}</p>
+                      <p className="font-mono text-xs text-muted-foreground truncate max-w-[200px] md:max-w-sm">Task {a.taskId}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest">Block {a.blockNumber}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-display text-xl text-signal">{a.score}</p>
-                      <p className="font-mono text-xs text-muted-foreground">+{a.payout.toFixed(3)} OG</p>
+                      <p className="font-display text-xl text-signal">{a.score}/100</p>
+                      <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">+{Number(a.payout).toFixed(2)} OG</p>
                     </div>
                   </li>
                 ))}

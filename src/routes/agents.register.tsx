@@ -3,9 +3,12 @@ import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TxStatusPanel } from "@/components/TxStatusPanel";
-import { mesh, type AgentOp, type Agent } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { useTxLifecycle, selfReceipt } from "@/lib/tx";
+import { useTxLifecycle } from "@/lib/tx";
+import { useWriteContract } from 'wagmi';
+import { parseEther, keccak256, toHex } from 'viem';
+import { CONTRACT_ADDRESSES, AGENT_REGISTRY_ABI } from "@/lib/contracts";
+import type { AgentOp } from "@/lib/sdk";
 
 export const Route = createFileRoute("/agents/register")({
   head: () => ({
@@ -33,23 +36,31 @@ function RegisterAgentPage() {
   const capList = caps.split(",").map((c) => c.trim()).filter(Boolean);
   const canSubmit = !!address && isCorrectChain && name.trim().length > 0 && stake > 0 && capList.length > 0;
 
-  const tx = useTxLifecycle<Agent>();
+  const { writeContractAsync } = useWriteContract();
+  const tx = useTxLifecycle<string>(); // Returns txHash on success
+
   const submit = async () => {
     if (!canSubmit) return;
     await tx.run(async () => {
-      const txHash = await selfReceipt(address!);
-      const a = mesh.agents.register({
-        name: name.trim(),
-        op,
-        stake,
-        capabilities: capList,
-        owner: address!,
+      // Construct the real agent name: e.g. "Researcher-Alpha"
+      const fullName = `${op}-${name.trim()}`;
+      // Calculate bytes32 agentId (keccak256 of the name string)
+      const agentId = keccak256(toHex(fullName));
+      
+      const txHash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES.agentRegistry,
+        abi: AGENT_REGISTRY_ABI,
+        functionName: 'register',
+        args: [agentId],
+        value: parseEther(stake.toString()),
       });
-      return { txHash, result: a };
+
+      return { txHash, result: fullName };
     });
   };
+
   const goToAgent = () => {
-    if (tx.result) navigate({ to: "/agents/$agentId", params: { agentId: tx.result.id } });
+    navigate({ to: "/agents/" });
   };
 
   return (

@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { DAGDiagram } from "@/components/DAGDiagram";
-import { useMesh } from "@/lib/sdk";
+import { useLiveDAGs, useLiveAgents, useGlobalSettlements } from "@/lib/onchain";
+import { useBlockNumber } from "wagmi";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,13 +37,15 @@ function HomePage() {
 }
 
 function Hero() {
-  const block = useMesh((s) => s.block);
-  const settled = useMesh((s) => s.settlements.length);
+  const { data: blockNumber } = useBlockNumber({ watch: true });
+  const { data: settlements = [] } = useGlobalSettlements();
+  const settled = settlements.length;
+  
   return (
     <section className="relative aurora overflow-hidden">
       <div className="absolute inset-0 grid-lines opacity-50 pointer-events-none" />
       <div className="container-edge pt-20 md:pt-24 pb-24 md:pb-32 relative">
-        <span className="chip"><span className="dot" /> Live on 0G Newton Mainnet</span>
+        <span className="chip"><span className="dot pulse-dot" /> Live on 0G Newton Mainnet</span>
         <div className="mt-8 grid lg:grid-cols-12 gap-8 lg:gap-10 items-end">
           <h1 className="lg:col-span-8 editorial-h1 text-4xl sm:text-5xl md:text-7xl lg:text-[5.5rem]">
             Agents that hire,<br />
@@ -61,7 +64,7 @@ function Hero() {
           <Link to="/docs" className="btn-ghost">Read the protocol</Link>
           <span className="ml-auto hidden md:flex items-center gap-2 text-xs text-muted-foreground font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-signal pulse-dot" />
-            {settled} settlements · block {block.toLocaleString()}
+            {settled} settlements · block {blockNumber?.toString() || "..."}
           </span>
         </div>
 
@@ -178,16 +181,15 @@ function ArchitectureBlock() {
 }
 
 function NumbersBlock() {
-  const dags = useMesh((s) => s.dags);
-  const agents = useMesh((s) => s.agents);
-  const attestations = useMesh((s) => s.attestations);
-  const settlements = useMesh((s) => s.settlements);
-  const released = settlements.reduce((s, x) => s + (x.kind === "release" ? x.amount : 0), 0);
+  const { data: dags = [] } = useLiveDAGs();
+  const { data: agents = [] } = useLiveAgents();
+  const { data: settlements = [] } = useGlobalSettlements();
+  const released = settlements.reduce((s, x) => s + Number(x.payout), 0);
 
   const stats = [
     { v: dags.length.toString(), l: "Task DAGs submitted" },
     { v: agents.length.toString(), l: "Registered agents" },
-    { v: attestations.length.toString(), l: "TEE attestations" },
+    { v: settlements.length.toString(), l: "TEE attestations" },
     { v: `${released.toFixed(2)} OG`, l: "Released onchain" },
   ];
   return (

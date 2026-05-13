@@ -39,109 +39,12 @@ export function isDeployed(key: keyof typeof CONTRACT_ADDRESSES): boolean {
   return CONTRACT_ADDRESSES[key] !== '0x';
 }
 
-// ─── ABI stubs ────────────────────────────────────────────────────────────────
-// Replace with real compiled ABI JSONs once contracts are deployed.
+import AgentRegistryJson from './abis/AgentRegistry.json';
+import TaskDAGRegistryJson from './abis/TaskDAGRegistry.json';
+import TEEVerifierBridgeJson from './abis/TEEVerifierBridge.json';
 
-export const MESH_ESCROW_ABI = [
-  {
-    name: 'lockBudget',
-    type: 'function',
-    stateMutability: 'payable',
-    inputs: [
-      { name: 'dagId',  type: 'bytes32' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [],
-  },
-  {
-    name: 'releasePayout',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'dagId',  type: 'bytes32' },
-      { name: 'nodeId', type: 'bytes32' },
-      { name: 'agent',  type: 'address' },
-    ],
-    outputs: [],
-  },
-  {
-    name: 'getLockedAmount',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'dagId', type: 'bytes32' }],
-    outputs: [{ type: 'uint256' }],
-  },
-] as const;
+export const AGENT_REGISTRY_ABI = AgentRegistryJson.abi;
+export const TASK_DAG_REGISTRY_ABI = TaskDAGRegistryJson.abi;
+export const TEE_VERIFIER_BRIDGE_ABI = TEEVerifierBridgeJson.abi;
 
-export const MESH_REGISTRY_ABI = [
-  {
-    name: 'registerAgent',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'name',     type: 'string' },
-      { name: 'op',       type: 'uint8'  },
-      { name: 'metadata', type: 'string' },
-    ],
-    outputs: [{ name: 'tokenId', type: 'uint256' }],
-  },
-  {
-    name: 'getAgent',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'agentAddr', type: 'address' }],
-    outputs: [
-      {
-        type: 'tuple',
-        components: [
-          { name: 'name',       type: 'string'  },
-          { name: 'reputation', type: 'uint256' },
-          { name: 'stake',      type: 'uint256' },
-        ],
-      },
-    ],
-  },
-] as const;
-
-export const TASK_DAG_ABI = [
-  {
-    name: 'submitDAG',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'title', type: 'string' },
-      {
-        name: 'nodes',
-        type: 'tuple[]',
-        components: [
-          { name: 'label',    type: 'string'  },
-          { name: 'nodeType', type: 'uint8'   },
-          { name: 'budget',   type: 'uint256' },
-        ],
-      },
-    ],
-    outputs: [{ name: 'dagId', type: 'bytes32' }],
-  },
-  {
-    name: 'getDAGStatus',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'dagId', type: 'bytes32' }],
-    outputs: [{ type: 'uint8' }],
-  },
-] as const;
-
-// ─── Read helpers ─────────────────────────────────────────────────────────────
-
-export async function getEscrowBalance(
-  client: PublicClient,
-  dagId: `0x${string}`,
-): Promise<bigint> {
-  if (!isDeployed('meshEscrow')) return 0n;
-  return client.readContract({
-    address: CONTRACT_ADDRESSES.meshEscrow,
-    abi: MESH_ESCROW_ABI,
-    functionName: 'getLockedAmount',
-    args: [dagId],
-  });
-}
+// The rest of the functions can remain or be removed later, for now we just export the real ABIs.

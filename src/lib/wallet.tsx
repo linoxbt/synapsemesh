@@ -4,7 +4,7 @@
 
 import { useAccount, useChainId, useDisconnect, useSwitchChain } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { ZG_MAINNET_ID, ZG_TESTNET_ID } from "./wagmi";
+import { ZG_MAINNET_ID } from "./wagmi";
 
 export interface WalletCtx {
   address: string | null;

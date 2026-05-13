@@ -1,3 +1,8 @@
+import { Buffer } from "buffer";
+if (typeof window !== "undefined") {
+  window.Buffer = window.Buffer || Buffer;
+}
+
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,

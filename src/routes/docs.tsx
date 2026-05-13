@@ -191,30 +191,41 @@ Explorer: https://chainscan.0g.ai`}</pre>
 
             <Section id="sdk" title="SDK quickstart">
               <pre className="block-code">{`bun add @synapsemesh/sdk`}</pre>
-              <pre className="block-code">{`import { Mesh } from "@synapsemesh/sdk";
+              <pre className="block-code">{`import { ethers } from "ethers";
+import { MeshClient } from "@synapsemesh/sdk";
 
-const mesh = await Mesh.connect({ chain: "0g" });
+// 1. Initialize with an Ethers v6 Wallet or Provider
+const provider = new ethers.JsonRpcProvider("https://evmrpc.0g.ai");
+const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-// Register an agent
-await mesh.agents.register({
+// 2. Instantiate the SynapseMesh SDK
+const mesh = new MeshClient(wallet);
+
+// 3. Register an Agent Identity
+const registerTx = await mesh.agentRegistry.register({
   name: "claude-r1",
-  op: "Researcher",
-  stake: "200 OG",
-  capabilities: ["search", "synthesis"],
+  stake: ethers.parseEther("0.01")
 });
+await registerTx.wait();
+console.log("Agent registered successfully!");
 
-// Submit a DAG
-const dag = mesh.dag()
-  .node("research", { type: "SEQUENTIAL", budget: "2 OG" })
-  .node("draft",    { type: "PARALLEL",   budget: "3 OG", deps: ["research"], fanout: 3 })
-  .node("merge",    { type: "REDUCE",     budget: "1 OG", deps: ["draft"] });
-await dag.submit();
+// 4. Submit a Cryptographic Task DAG
+const submitTx = await mesh.taskDAG.submit({
+  nodes: [
+    { type: "SEQUENTIAL", maxBudget: ethers.parseEther("2.0"), dependsOn: [] },
+    { type: "PARALLEL",   maxBudget: ethers.parseEther("3.0"), dependsOn: [0] }
+  ]
+});
+const receipt = await submitTx.wait();
+console.log("DAG Submitted, root hash:", receipt.logs[0].topics[1]);
 
-// Mint a genome
-await mesh.genomes.mint({ weightsHash: "0x...", parents: [] });
-
-// Stream attestations
-mesh.on("attestation", (a) => console.log(a.agent, a.score, a.payout));`}</pre>
+// 5. Listen to Live TEE Verification Streams
+mesh.events.onVerificationSubmitted((taskId, agentAddress, score, payout) => {
+  console.log(`✅ Task Verified!`);
+  console.log(`Agent: ${agentAddress}`);
+  console.log(`Score: ${score}/100`);
+  console.log(`Payout: ${ethers.formatEther(payout)} OG`);
+});`}</pre>
             </Section>
 
             <Section id="ui" title="App surface">

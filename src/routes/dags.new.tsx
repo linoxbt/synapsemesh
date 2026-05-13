@@ -3,9 +3,12 @@ import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TxStatusPanel } from "@/components/TxStatusPanel";
-import { mesh, type NodeType, type TaskDAG } from "@/lib/sdk";
 import { useWallet } from "@/lib/wallet";
-import { useTxLifecycle, selfReceipt } from "@/lib/tx";
+import { useTxLifecycle } from "@/lib/tx";
+import { useWriteContract } from 'wagmi';
+import { parseEther, keccak256, toHex } from 'viem';
+import { CONTRACT_ADDRESSES, TASK_DAG_REGISTRY_ABI } from "@/lib/contracts";
+import type { NodeType } from "@/lib/sdk";
 
 export const Route = createFileRoute("/dags/new")({
   head: () => ({
@@ -51,26 +54,54 @@ function NewDagPage() {
     && nodes.length > 0 && nodes.every((n) => n.label.trim() && n.budget > 0)
     && new Set(labels).size === labels.length;
 
-  const tx = useTxLifecycle<TaskDAG>();
+  const { writeContractAsync } = useWriteContract();
+  const tx = useTxLifecycle<string>();
+
   const submit = async () => {
     if (!canSubmit) return;
     await tx.run(async () => {
-      const txHash = await selfReceipt(address!);
-      const dag = mesh.dags.submit({
-        title: title.trim(),
-        owner: address!,
-        nodes: nodes.map((n) => ({
-          label: n.label.trim(),
-          type: n.type,
-          budget: Number(n.budget),
-          deps: n.deps,
-        })),
+      // Create a unique dagRoot
+      const dagRoot = keccak256(toHex(`${title}-${Date.now()}`));
+
+      // Helper to deterministically generate taskId based on dagRoot + label
+      const getTaskId = (label: string) => keccak256(toHex(`${dagRoot}-${label.trim()}`));
+
+      const NODE_TYPE_MAP: Record<string, number> = {
+        SEQUENTIAL: 0,
+        PARALLEL: 1,
+        CONDITIONAL: 2,
+        REDUCE: 3
+      };
+
+      const taskNodes = nodes.map((n) => ({
+        taskId: getTaskId(n.label),
+        inputSchemaHash: keccak256(toHex("mock-input")), // In production, hash of 0G Storage CID
+        outputSchemaHash: keccak256(toHex("mock-output")),
+        qualityRubricHash: keccak256(toHex("mock-rubric")),
+        dependsOn: n.deps.map(depLabel => getTaskId(depLabel)),
+        nodeType: NODE_TYPE_MAP[n.type],
+        maxBudget: parseEther(n.budget.toString()),
+        timeoutBlocks: 100n, // e.g. 100 blocks
+        assignedAgent: '0x0000000000000000000000000000000000000000' as `0x${string}`,
+        status: 0, // PENDING
+        assignedAt: 0n,
+        completedAt: 0n
+      }));
+
+      const txHash = await writeContractAsync({
+        address: CONTRACT_ADDRESSES.taskDagRegistry,
+        abi: TASK_DAG_REGISTRY_ABI,
+        functionName: 'submitDAG',
+        args: [dagRoot, taskNodes],
+        value: parseEther(totalBudget.toString()),
       });
-      return { txHash, result: dag };
+
+      return { txHash, result: dagRoot };
     });
   };
+
   const goToDag = () => {
-    if (tx.result) navigate({ to: "/explorer/$dagId", params: { dagId: tx.result.id } });
+    if (tx.result) navigate({ to: "/explorer" }); // We'll navigate to explorer for now, as fetching by ID needs a hook
   };
 
   return (

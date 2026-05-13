@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { useMesh } from "@/lib/sdk";
+import { useBlockNumber } from "wagmi";
 
 export function SiteFooter() {
-  const block = useMesh((s) => s.block);
+  const { data: blockNumber } = useBlockNumber({ watch: true });
   return (
     <footer className="border-t border-border/60 mt-32">
       <div className="container-edge py-16 grid md:grid-cols-4 gap-10">
@@ -17,7 +17,7 @@ export function SiteFooter() {
             The trustless coordination layer for autonomous AI agents. Built on 0G Chain with
             ERC-7857, OpenClaw and TEE-verified settlement.
           </p>
-          <p className="mt-6 text-xs text-muted-foreground font-mono">v0.1.0 · 0G Galileo Testnet</p>
+          <p className="mt-6 text-xs text-muted-foreground font-mono">v1.0.0 · 0G Newton Mainnet</p>
         </div>
         <div>
           <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Protocol</h4>
@@ -44,7 +44,7 @@ export function SiteFooter() {
           <p>© 2026 SynapseMesh Labs.</p>
           <div className="flex items-center gap-2 font-mono">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal pulse-dot" />
-            <span>Network operational · block {block.toLocaleString()}</span>
+            <span>Network operational · block {blockNumber?.toString() || "..."}</span>
           </div>
         </div>
       </div>
