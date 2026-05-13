@@ -44,17 +44,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <ConnectButton 
-            accountStatus={{
-              smallScreen: 'avatar',
-              largeScreen: 'full',
-            }}
-            showBalance={{
-              smallScreen: false,
-              largeScreen: true,
-            }}
-            chainStatus="icon"
-          />
+          <ConnectButton />
           
           <button
             className="lg:hidden p-2 rounded-md border border-border ml-2"
