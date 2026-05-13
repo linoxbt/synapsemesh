@@ -1,0 +1,26 @@
+[
+  {
+    "id": 2,
+    "name": "Agent-Omega-2",
+    "address": "0x4C47a767817Ad4073a4F652cfF2D63283A3ba855",
+    "privateKey": "0x80d4d08a56e57dc8a21a1570f9d74a7450108f390419df96fa6399f095b92d3d"
+  },
+  {
+    "id": 3,
+    "name": "Agent-Omega-3",
+    "address": "0x741fAC6FC674CAC1d4cF6F448925DE0d10E12101",
+    "privateKey": "0x37dcc8618965f7428ef514bdc11180a1103e264ada0f210fdaee2d34521eec9a"
+  },
+  {
+    "id": 4,
+    "name": "Agent-Omega-4",
+    "address": "0x5cccEC744153F2C93Af754E50c7585E7095240Ec",
+    "privateKey": "0xb31f430ad884acae9eacfa120fb8cd90a34ff2c5e4992cd1c1e279d441c45def"
+  },
+  {
+    "id": 5,
+    "name": "Agent-Omega-5",
+    "address": "0x3fac5842067787Fc05233544dBbaFc412f830b4A",
+    "privateKey": "0xb71930dc8e4e48230b9ce835cf199e49c7eb5edcb7c51b7b21ed6fc42a01d84b"
+  }
+]
