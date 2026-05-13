@@ -34,7 +34,7 @@ export const ZG_EXPLORER = (import.meta as { env?: Record<string, string> }).env
 export const TEE_VERIFIER = (import.meta as { env?: Record<string, string> }).env?.VITE_TEE_VERIFIER_ADDRESS || "";
 export const TEE_TOPIC = (import.meta as { env?: Record<string, string> }).env?.VITE_TEE_ATTEST_TOPIC
   // keccak256("AttestationPosted(bytes32,bytes32,address,uint256,uint256)")
-  || "0x6f52d3c2f5b4c2a7c3d5b2c4f1a3b9d2c8e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9";
+  || "0xeb26a43a6c659dd466d7b33eb02355968ec2f414bf1419f72bcd5674773329c8";
 
 const CURSOR_KEY = "synapsemesh.tee.cursor";
 const SEEN_KEY = "synapsemesh.tee.seen";

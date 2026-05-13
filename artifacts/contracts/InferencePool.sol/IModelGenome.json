@@ -1,0 +1,117 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IModelGenome",
+  "sourceName": "contracts/InferencePool.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "genomeId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "accrueRevenue",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getGenome",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "genomeId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "baseModelId",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "adapterStorageRoot",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "parentIds",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "uint32",
+          "name": "generation",
+          "type": "uint32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "fitnessScore",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "lineageRoot",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "uint8",
+          "name": "status",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint256",
+          "name": "inferenceRevenue",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "mintedAt",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "speciesId",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "ownerOf",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

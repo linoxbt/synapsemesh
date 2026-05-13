@@ -16,32 +16,22 @@ function addr(key: string): Address {
 }
 
 export const CONTRACT_ADDRESSES = {
-  // 1. ERC-20 governance/utility token
-  meshToken:      addr('VITE_CONTRACT_MESH_TOKEN'),
-  // 2. Atomic per-node escrow — holds and releases task budgets
-  meshEscrow:     addr('VITE_CONTRACT_MESH_ESCROW'),
-  // 3. ERC-7857 INFT registry — onchain agent identities
-  meshRegistry:   addr('VITE_CONTRACT_MESH_REGISTRY'),
-  // 4. Task DAG submission & state machine
-  taskDag:        addr('VITE_CONTRACT_TASK_DAG'),
-  // 5. Agent staking & slashing logic
-  meshStaking:    addr('VITE_CONTRACT_MESH_STAKING'),
-  // 6. TEE attestation verifier — trusted oracle for work verification
-  teeVerifier:    addr('VITE_CONTRACT_TEE_VERIFIER'),
-  // 7. On-chain governance (proposals & voting)
-  meshGovernor:   addr('VITE_CONTRACT_MESH_GOVERNOR'),
-  // 8. Protocol treasury — fee accumulation and distribution
-  meshTreasury:   addr('VITE_CONTRACT_MESH_TREASURY'),
-  // 9. Factory for deploying agent-specific sub-contracts
-  meshFactory:    addr('VITE_CONTRACT_MESH_FACTORY'),
-  // 10. Price oracle — OG/USD, feeds escrow calculations
-  meshOracle:     addr('VITE_CONTRACT_MESH_ORACLE'),
-  // 11. ERC-7857 INFT token (the agent NFT itself)
-  meshINFT:       addr('VITE_CONTRACT_MESH_INFT'),
-  // 12. Cross-chain bridge adapter (0G <-> EVM chains)
-  meshBridge:     addr('VITE_CONTRACT_MESH_BRIDGE'),
-  // 13. Agent incentives & reward distributor
-  meshIncentives: addr('VITE_CONTRACT_MESH_INCENTIVES'),
+  // System 1: Task Economy
+  meshEscrow:        addr('VITE_CONTRACT_MESH_ESCROW'),
+  agentRegistry:     addr('VITE_CONTRACT_AGENT_REGISTRY'),
+  taskDagRegistry:   addr('VITE_CONTRACT_TASK_DAG_REGISTRY'),
+  bidEngine:         addr('VITE_CONTRACT_BID_ENGINE'),
+  teeVerifierBridge: addr('VITE_CONTRACT_TEE_VERIFIER_BRIDGE'),
+  revenueRouter:     addr('VITE_CONTRACT_REVENUE_ROUTER'),
+
+  // System 2: Evolution Lab
+  fitnessOracle:     addr('VITE_CONTRACT_FITNESS_ORACLE'),
+  genOps:            addr('VITE_CONTRACT_GEN_OPS'),
+  modelGenome:       addr('VITE_CONTRACT_MODEL_GENOME'),
+  evolutionClock:    addr('VITE_CONTRACT_EVOLUTION_CLOCK'),
+  inferencePool:     addr('VITE_CONTRACT_INFERENCE_POOL'),
+  genomeMarket:      addr('VITE_CONTRACT_GENOME_MARKET'),
+  genomeDAO:         addr('VITE_CONTRACT_GENOME_DAO'),
 } as const;
 
 /** Returns true when a contract address has been deployed (non-zero). */
