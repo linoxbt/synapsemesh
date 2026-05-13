@@ -1,5 +1,5 @@
 {
-  "name": "@synapsemesh/sdk",
+  "name": "synapsemesh-sdk",
   "version": "1.0.0",
   "description": "The official SDK for interacting with the SynapseMesh Task Economy and Evolution Lab on 0G Chain.",
   "main": "dist/index.js",

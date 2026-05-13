@@ -190,9 +190,9 @@ Explorer: https://chainscan.0g.ai`}</pre>
             </Section>
 
             <Section id="sdk" title="SDK quickstart">
-              <pre className="block-code">{`bun add @synapsemesh/sdk`}</pre>
+              <pre className="block-code">{`bun add synapsemesh-sdk`}</pre>
               <pre className="block-code">{`import { ethers } from "ethers";
-import { MeshClient } from "@synapsemesh/sdk";
+import { MeshClient } from "synapsemesh-sdk";
 
 // 1. Initialize with an Ethers v6 Wallet or Provider
 const provider = new ethers.JsonRpcProvider("https://evmrpc.0g.ai");
