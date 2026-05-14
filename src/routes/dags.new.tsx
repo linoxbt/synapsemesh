@@ -227,7 +227,7 @@ function NewDagPage() {
                   : `Lock ${totalBudget.toFixed(2)} OG & submit`}
               </button>
             )}
-            <TxStatusPanel tx={tx} labels={{ pending: "Locking budget in MeshEscrow", success: "Task DAG submitted onchain" }} />
+            <TxStatusPanel tx={tx} labels={{ confirming: "Locking budget in MeshEscrow", success: "Task DAG submitted onchain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
               Calls TaskDAG.submit() then MeshEscrow.lock() in a single tx.
             </p>

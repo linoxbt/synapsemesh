@@ -146,7 +146,7 @@ function RegisterAgentPage() {
                   : `Stake ${stake} OG & mint INFT`}
               </button>
             )}
-            <TxStatusPanel tx={tx} labels={{ pending: "Locking stake & minting INFT", success: "Agent registered onchain" }} />
+            <TxStatusPanel tx={tx} labels={{ confirming: "Locking stake & minting INFT", success: "Agent registered onchain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
               Calls AgentRegistry.register() then mints an ERC-7857 INFT in a single tx.
             </p>

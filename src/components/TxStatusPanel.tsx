@@ -2,7 +2,7 @@ import type { TxLifecycle } from "@/lib/tx";
 
 export function TxStatusPanel<T>({ tx, labels }: {
   tx: TxLifecycle<T>;
-  labels?: { pending?: string; success?: string };
+  labels?: { confirming?: string; success?: string };
 }) {
   if (tx.status === "idle") return null;
   const tone =
@@ -10,9 +10,9 @@ export function TxStatusPanel<T>({ tx, labels }: {
     : tx.status === "error" ? "border-destructive/40 text-destructive"
     : "border-accent/40 text-accent";
   const label =
-    tx.status === "awaitingWallet" ? "Confirm in your wallet"
-    : tx.status === "pending" ? (labels?.pending ?? "Submitting transaction")
-    : tx.status === "success" ? (labels?.success ?? "Transaction confirmed")
+    tx.status === "awaitingWallet" ? "Confirm in your wallet…"
+    : tx.status === "confirming"   ? (labels?.confirming ?? "Confirming on 0G Chain…")
+    : tx.status === "success"      ? (labels?.success ?? "Transaction confirmed")
     : "Transaction failed";
   return (
     <div className={`mt-4 border rounded-xl p-4 ${tone}`}>
