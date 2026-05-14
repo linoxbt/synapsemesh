@@ -1,16 +1,22 @@
 // Real onchain TEE attestation streamer.
 // Polls eth_getLogs against the configured 0G Chain RPC for AttestationPosted
 // events emitted by the TEE Verifier contract. Includes:
-//   - Last-seen block cursor (persisted to localStorage)
-//   - Reconnection with exponential backoff
+//   - Last-seen block cursor (persisted to localStorage), clamped on hydration
+//     so a stale cursor never triggers a 33M-block backfill
+//   - Adaptive chunk size — halves on RPC range errors, grows back on success
+//   - Adaptive tick interval — short while catching up, long when steady
+//   - Reconnection with exponential backoff on transport errors
 //   - Deduplication by `${txHash}:${logIndex}`
 //   - Graceful empty state when no contract is configured
 //
 // Configure via Vite env:
-//   VITE_ZG_RPC_URL                (default: https://evmrpc-testnet.0g.ai)
-//   VITE_ZG_EXPLORER               (default: https://chainscan-galileo.0g.ai)
+//   VITE_ZG_RPC_URL                (default: https://evmrpc.0g.ai)
+//   VITE_ZG_EXPLORER               (default: https://chainscan.0g.ai)
 //   VITE_TEE_VERIFIER_ADDRESS      (required for live stream)
 //   VITE_TEE_ATTEST_TOPIC          (defaults to keccak256("AttestationPosted(bytes32,bytes32,address,uint256,uint256)"))
+//   VITE_INDEX_FROM_BLOCK          (optional lower bound — usually the contract deploy block)
+//   VITE_INDEX_LOOKBACK_BLOCKS     (default 10000 — caps how far back to scan)
+//   VITE_INDEX_CHUNK_BLOCKS        (default 5000  — target chunk size per eth_getLogs)
 
 import { useEffect, useRef, useState } from "react";
 
@@ -27,14 +33,37 @@ export interface ChainAttestation {
   timestamp: number;   // ms
 }
 
-export const ZG_RPC = (import.meta as { env?: Record<string, string> }).env?.VITE_ZG_RPC_URL
-  || "https://evmrpc.0g.ai";
-export const ZG_EXPLORER = (import.meta as { env?: Record<string, string> }).env?.VITE_ZG_EXPLORER
-  || "https://chainscan.0g.ai";
-export const TEE_VERIFIER = (import.meta as { env?: Record<string, string> }).env?.VITE_TEE_VERIFIER_ADDRESS || "";
-export const TEE_TOPIC = (import.meta as { env?: Record<string, string> }).env?.VITE_TEE_ATTEST_TOPIC
+const ENV =
+  (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
+
+const readPositiveInt = (key: string, fallback: number): number => {
+  const raw = ENV[key];
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+};
+
+export const ZG_RPC = ENV.VITE_ZG_RPC_URL || "https://evmrpc.0g.ai";
+export const ZG_EXPLORER = ENV.VITE_ZG_EXPLORER || "https://chainscan.0g.ai";
+export const TEE_VERIFIER = ENV.VITE_TEE_VERIFIER_ADDRESS || "";
+export const TEE_TOPIC =
+  ENV.VITE_TEE_ATTEST_TOPIC
   // keccak256("AttestationPosted(bytes32,bytes32,address,uint256,uint256)")
   || "0xeb26a43a6c659dd466d7b33eb02355968ec2f414bf1419f72bcd5674773329c8";
+
+// Bounds for the historical scan. INDEX_FROM_BLOCK is an absolute floor (e.g.
+// the contract deploy block); LOOKBACK is a sliding window relative to head.
+// We start from max(FROM_BLOCK, head - LOOKBACK) and never scan further back.
+const INDEX_FROM_BLOCK = readPositiveInt("VITE_INDEX_FROM_BLOCK", 0);
+const INDEX_LOOKBACK_BLOCKS = readPositiveInt("VITE_INDEX_LOOKBACK_BLOCKS", 10_000);
+const INDEX_CHUNK_BLOCKS = readPositiveInt("VITE_INDEX_CHUNK_BLOCKS", 5_000);
+const MIN_CHUNK_BLOCKS = 100;
+
+// Tick cadence. Catching up should burn through chunks fast; once we are at the
+// head we only need to poll for new blocks every few seconds.
+const STEADY_TICK_MS = 4_000;
+const CATCHUP_TICK_MS = 250;
+const MAX_BACKOFF_MS = 30_000;
 
 const CURSOR_KEY = "synapsemesh.tee.cursor";
 const SEEN_KEY = "synapsemesh.tee.seen";
@@ -83,6 +112,10 @@ function decodeLog(log: {
   };
 }
 
+// Heuristic: does this look like an "eth_getLogs range too large" error from
+// the upstream RPC? Different node implementations word this differently.
+const RANGE_ERROR_RE = /range|limit|too many|exceed|wider|max.*block|block.*max/i;
+
 interface StreamState {
   attestations: ChainAttestation[];
   status: "idle" | "connecting" | "live" | "error" | "unconfigured";
@@ -112,34 +145,87 @@ export function useChainAttestations(limit = 50): StreamState {
     let cursor: number | null = null;
     try {
       const c = localStorage.getItem(CURSOR_KEY);
-      if (c) cursor = Number(c);
+      if (c) {
+        const parsed = Number(c);
+        if (Number.isFinite(parsed) && parsed >= 0) cursor = parsed;
+      }
     } catch { /* ignore */ }
 
-    let backoff = 1000;
+    let chunkSize = INDEX_CHUNK_BLOCKS;
+    let errorBackoff = 1_000;
     let timer: ReturnType<typeof setTimeout> | null = null;
+
+    // Earliest block we are willing to scan, given the current head. Pulled
+    // into a helper because we apply it both on first run AND when hydrating
+    // an old cursor — a cursor persisted from a previous (broken) session can
+    // be tens of millions of blocks behind head, and without clamping the loop
+    // would burn hours catching up.
+    const earliestScanBlock = (head: number) =>
+      Math.max(INDEX_FROM_BLOCK, head - INDEX_LOOKBACK_BLOCKS);
 
     async function tick() {
       if (stoppedRef.current) return;
       try {
         const headHex = await rpc<string>("eth_blockNumber", []);
         const head = toNum(headHex);
-        const fromBlock = cursor !== null ? cursor + 1 : Math.max(0, head - 200);
+        const earliest = earliestScanBlock(head);
+
+        if (cursor === null) {
+          // First run: position cursor just before `earliest` so the next
+          // chunk starts at `earliest`.
+          cursor = Math.max(0, earliest - 1);
+        } else if (cursor < earliest - 1) {
+          // Stale cursor fast-forward. We intentionally drop logs older than
+          // the lookback window — operators wanting full history should raise
+          // VITE_INDEX_LOOKBACK_BLOCKS or rely on a real indexer.
+          cursor = earliest - 1;
+        }
+
+        const fromBlock = cursor + 1;
+
         if (fromBlock > head) {
-          setState((s) => ({ ...s, status: "live", error: null, cursorBlock: head }));
-          backoff = 4000;
-          timer = setTimeout(tick, backoff);
+          // Caught up. Only re-render if something the consumer cares about
+          // actually changed.
+          setState((s) =>
+            s.status === "live" && s.cursorBlock === head && s.error === null
+              ? s
+              : { ...s, status: "live", error: null, cursorBlock: head },
+          );
+          errorBackoff = 1_000;
+          timer = setTimeout(tick, STEADY_TICK_MS);
           return;
         }
-        // chunk to keep RPC happy
-        const toBlock = Math.min(head, fromBlock + 999);
-        const logs = await rpc<Array<{
-          transactionHash: string; logIndex: string; blockNumber: string; topics: string[]; data: string;
-        }>>("eth_getLogs", [{
-          fromBlock: "0x" + fromBlock.toString(16),
-          toBlock: "0x" + toBlock.toString(16),
-          address: TEE_VERIFIER,
-          topics: [TEE_TOPIC],
-        }]);
+
+        const toBlock = Math.min(head, fromBlock + chunkSize - 1);
+
+        let logs: Array<{
+          transactionHash: string;
+          logIndex: string;
+          blockNumber: string;
+          topics: string[];
+          data: string;
+        }>;
+        try {
+          logs = await rpc<typeof logs>("eth_getLogs", [{
+            fromBlock: "0x" + fromBlock.toString(16),
+            toBlock: "0x" + toBlock.toString(16),
+            address: TEE_VERIFIER,
+            topics: [TEE_TOPIC],
+          }]);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (RANGE_ERROR_RE.test(msg) && chunkSize > MIN_CHUNK_BLOCKS) {
+            chunkSize = Math.max(MIN_CHUNK_BLOCKS, Math.floor(chunkSize / 2));
+            timer = setTimeout(tick, CATCHUP_TICK_MS);
+            return;
+          }
+          throw err;
+        }
+
+        // The request succeeded — try to grow the chunk back toward target.
+        if (chunkSize < INDEX_CHUNK_BLOCKS) {
+          chunkSize = Math.min(INDEX_CHUNK_BLOCKS, chunkSize * 2);
+        }
 
         const fresh: ChainAttestation[] = [];
         for (const l of logs) {
@@ -148,31 +234,46 @@ export function useChainAttestations(limit = 50): StreamState {
           seenRef.current.add(att.id);
           fresh.push(att);
         }
-        // bound seen set
         if (seenRef.current.size > MAX_SEEN) {
           seenRef.current = new Set(Array.from(seenRef.current).slice(-MAX_SEEN));
         }
         cursor = toBlock;
         try {
           localStorage.setItem(CURSOR_KEY, String(cursor));
-          localStorage.setItem(SEEN_KEY, JSON.stringify(Array.from(seenRef.current).slice(-MAX_SEEN)));
+          if (fresh.length) {
+            localStorage.setItem(
+              SEEN_KEY,
+              JSON.stringify(Array.from(seenRef.current).slice(-MAX_SEEN)),
+            );
+          }
         } catch { /* ignore */ }
 
-        setState((s) => ({
-          attestations: fresh.length
-            ? [...fresh.reverse(), ...s.attestations].slice(0, limit)
-            : s.attestations,
-          status: "live",
-          error: null,
-          cursorBlock: cursor,
-        }));
-        backoff = 4000;
-        timer = setTimeout(tick, backoff);
+        if (fresh.length) {
+          setState((s) => ({
+            attestations: [...fresh.reverse(), ...s.attestations].slice(0, limit),
+            status: "live",
+            error: null,
+            cursorBlock: cursor,
+          }));
+        } else {
+          setState((s) =>
+            s.status === "live" && s.cursorBlock === cursor && s.error === null
+              ? s
+              : { ...s, status: "live", error: null, cursorBlock: cursor },
+          );
+        }
+
+        errorBackoff = 1_000;
+        // Adaptive cadence: if we are still meaningfully behind head, drive
+        // the next chunk fast; otherwise back off to steady-state polling.
+        const behind = head - toBlock;
+        const nextDelay = behind > chunkSize ? CATCHUP_TICK_MS : STEADY_TICK_MS;
+        timer = setTimeout(tick, nextDelay);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setState((s) => ({ ...s, status: "error", error: msg }));
-        backoff = Math.min(backoff * 2, 30_000);
-        timer = setTimeout(tick, backoff);
+        errorBackoff = Math.min(errorBackoff * 2, MAX_BACKOFF_MS);
+        timer = setTimeout(tick, errorBackoff);
       }
     }
 

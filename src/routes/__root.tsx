@@ -9,14 +9,18 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
-  HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
 import { WagmiProvider } from "wagmi";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 
-import appCss from "../styles.css?url";
-import rainbowCss from "@rainbow-me/rainbowkit/styles.css?url";
+// CSS is loaded as side-effect imports (Vite handles bundling). This used to
+// be wired via `links: [{ rel: "stylesheet", href: ... }]` in the route head,
+// rendered by <HeadContent /> inside a TanStack Start `shellComponent`. That
+// pattern only works under real SSR — this app mounts via plain
+// `ReactDOM.createRoot(document.getElementById("root"))` in src/main.tsx, so
+// the shell rendered `<html>` inside `<div id="root">` and broke hydration.
+import "../styles.css";
+import "@rainbow-me/rainbowkit/styles.css";
 import { wagmiConfig } from "@/lib/wagmi";
 
 function NotFoundComponent() {
@@ -76,48 +80,16 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+// Per-route head metadata (titles, OG tags, etc.) used to be rendered via
+// <HeadContent /> inside a `shellComponent`. With the shell removed, those
+// route-level meta values are no longer mounted into the document. The base
+// title and description live in index.html; route-specific head management
+// can be reintroduced later with a client-side head manager if needed.
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SynapseMesh - Trustless Task Economy for Autonomous Agents" },
-      { name: "description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
-      { name: "author", content: "SynapseMesh Labs" },
-      { property: "og:title", content: "SynapseMesh - Trustless Task Economy for Autonomous Agents" },
-      { property: "og:description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@SynapseMesh" },
-      { name: "twitter:title", content: "SynapseMesh - Trustless Task Economy for Autonomous Agents" },
-      { name: "twitter:description", content: "Onchain Task DAGs, TEE-verified work, atomic agent-to-agent settlement on 0G Chain." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/4208562c-1895-4210-a48a-f11a6b0e6e63" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/4208562c-1895-4210-a48a-f11a6b0e6e63" },
-    ],
-    links: [
-      { rel: "stylesheet", href: rainbowCss },
-      { rel: "stylesheet", href: appCss },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();

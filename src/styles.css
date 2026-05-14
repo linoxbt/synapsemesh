@@ -76,26 +76,9 @@
 }
 
 @layer base {
-  @font-face {
-    font-family: "Fraunces";
-    src: url("https://fonts.gstatic.com/s/fraunces/v36/6NUh8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk.woff2") format("woff2");
-    font-weight: 300 900;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: "Inter";
-    src: url("https://fonts.gstatic.com/s/inter/v19/UcCO3FwrK3iLTeHuS_nVMrMxCp50ojIw2boKoduKmMEVuLyfMZg.woff2") format("woff2");
-    font-weight: 100 900;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: "JetBrains Mono";
-    src: url("https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.woff2") format("woff2");
-    font-weight: 100 800;
-    font-display: swap;
-  }
+  /* Fonts are loaded via the Google Fonts CSS API from index.html.
+     The CSS API always points at the current woff2 hashes; hard-coding
+     gstatic URLs here led to 404s when Google rotated the file names. */
 
   * { border-color: var(--color-border); }
   html { scroll-behavior: smooth; }
