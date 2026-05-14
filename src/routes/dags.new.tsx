@@ -24,22 +24,52 @@ export const Route = createFileRoute("/dags/new")({
 
 const TYPES: NodeType[] = ["SEQUENTIAL", "PARALLEL", "CONDITIONAL", "REDUCE"];
 
+const NODE_TYPE_MAP: Record<string, number> = {
+  SEQUENTIAL: 0,
+  PARALLEL: 1,
+  CONDITIONAL: 2,
+  REDUCE: 3,
+};
+
 interface DraftNode {
   id: string;
   label: string;
   type: NodeType;
   budget: number;
-  deps: string[]; // labels of upstream nodes
+  deps: string[];     // labels of upstream nodes
+  // Schema fields — hashed client-side before submission.
+  // These are real commitments: keccak256 of the text is stored onchain.
+  // A TEE judge resolves these hashes back to rubric content via 0G Storage.
+  inputSchema: string;    // e.g. "JSON object with keys: topic, max_words"
+  outputSchema: string;   // e.g. "Markdown string, max 500 words"
+  qualityRubric: string;  // e.g. "Score 0-100: factual accuracy 60%, conciseness 40%"
 }
 
 function uid() { return Math.random().toString(36).slice(2, 8); }
+
+/** Deterministically commit a schema string to bytes32 via keccak256. */
+function schemaHash(content: string): `0x${string}` {
+  // An empty schema defaults to ZeroHash so the contract can detect it as unset.
+  if (!content.trim()) return "0x0000000000000000000000000000000000000000000000000000000000000000";
+  return keccak256(toHex(content.trim()));
+}
 
 function NewDagPage() {
   const { address, connect, isCorrectChain, switchToZg } = useWallet();
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
+  const [showSchemas, setShowSchemas] = useState(false);
   const [nodes, setNodes] = useState<DraftNode[]>([
-    { id: uid(), label: "Research", type: "SEQUENTIAL", budget: 1, deps: [] },
+    {
+      id: uid(),
+      label: "Research",
+      type: "SEQUENTIAL",
+      budget: 1,
+      deps: [],
+      inputSchema: "",
+      outputSchema: "",
+      qualityRubric: "",
+    },
   ]);
 
   const totalBudget = nodes.reduce((s, n) => s + (Number(n.budget) || 0), 0);
@@ -48,11 +78,28 @@ function NewDagPage() {
   const update = (id: string, patch: Partial<DraftNode>) =>
     setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, ...patch } : n)));
   const remove = (id: string) => setNodes((ns) => ns.filter((n) => n.id !== id));
-  const add = () => setNodes((ns) => [...ns, { id: uid(), label: `Node ${ns.length + 1}`, type: "SEQUENTIAL", budget: 1, deps: [] }]);
+  const add = () =>
+    setNodes((ns) => [
+      ...ns,
+      {
+        id: uid(),
+        label: `Node ${ns.length + 1}`,
+        type: "SEQUENTIAL",
+        budget: 1,
+        deps: [],
+        inputSchema: "",
+        outputSchema: "",
+        qualityRubric: "",
+      },
+    ]);
 
-  const canSubmit = !!address && isCorrectChain && title.trim().length > 0
-    && nodes.length > 0 && nodes.every((n) => n.label.trim() && n.budget > 0)
-    && new Set(labels).size === labels.length;
+  const canSubmit =
+    !!address &&
+    isCorrectChain &&
+    title.trim().length > 0 &&
+    nodes.length > 0 &&
+    nodes.every((n) => n.label.trim() && n.budget > 0) &&
+    new Set(labels).size === labels.length;
 
   const { writeContractAsync } = useWriteContract();
   const tx = useTxLifecycle<string>();
@@ -60,38 +107,38 @@ function NewDagPage() {
   const submit = async () => {
     if (!canSubmit) return;
     await tx.run(async () => {
-      // Create a unique dagRoot
-      const dagRoot = keccak256(toHex(`${title}-${Date.now()}`));
+      // dagRoot is a unique identifier for this entire DAG.
+      const dagRoot = keccak256(toHex(`${title.trim()}-${Date.now()}`));
 
-      // Helper to deterministically generate taskId based on dagRoot + label
-      const getTaskId = (label: string) => keccak256(toHex(`${dagRoot}-${label.trim()}`));
-
-      const NODE_TYPE_MAP: Record<string, number> = {
-        SEQUENTIAL: 0,
-        PARALLEL: 1,
-        CONDITIONAL: 2,
-        REDUCE: 3
-      };
+      // taskId is deterministic per (dagRoot, node label) pair so dependency
+      // references resolve correctly without a second RPC call.
+      const getTaskId = (label: string): `0x${string}` =>
+        keccak256(toHex(`${dagRoot}-${label.trim()}`));
 
       const taskNodes = nodes.map((n) => ({
         taskId: getTaskId(n.label),
-        inputSchemaHash: keccak256(toHex("mock-input")), // In production, hash of 0G Storage CID
-        outputSchemaHash: keccak256(toHex("mock-output")),
-        qualityRubricHash: keccak256(toHex("mock-rubric")),
-        dependsOn: n.deps.map(depLabel => getTaskId(depLabel)),
-        nodeType: NODE_TYPE_MAP[n.type],
-        maxBudget: parseEther(n.budget.toString()),
-        timeoutBlocks: 100n, // e.g. 100 blocks
-        assignedAgent: '0x0000000000000000000000000000000000000000' as `0x${string}`,
-        status: 0, // PENDING
-        assignedAt: 0n,
-        completedAt: 0n
+
+        // Real schema commitments derived from user input.
+        // keccak256(utf8(content)) is the canonical on-chain representation.
+        // Content can be pinned to 0G Storage separately; the hash is the proof.
+        inputSchemaHash:    schemaHash(n.inputSchema   || n.label + ":input"),
+        outputSchemaHash:   schemaHash(n.outputSchema  || n.label + ":output"),
+        qualityRubricHash:  schemaHash(n.qualityRubric || n.label + ":rubric"),
+
+        dependsOn:    n.deps.map((depLabel) => getTaskId(depLabel)),
+        nodeType:     NODE_TYPE_MAP[n.type],
+        maxBudget:    parseEther(n.budget.toString()),
+        timeoutBlocks: 100n,
+        assignedAgent: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+        status:       0,    // NodeStatus.PENDING
+        assignedAt:   0n,
+        completedAt:  0n,
       }));
 
       const txHash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.taskDagRegistry,
         abi: TASK_DAG_REGISTRY_ABI,
-        functionName: 'submitDAG',
+        functionName: "submitDAG",
         args: [dagRoot, taskNodes],
         value: parseEther(totalBudget.toString()),
       });
@@ -101,7 +148,7 @@ function NewDagPage() {
   };
 
   const goToDag = () => {
-    if (tx.result) navigate({ to: "/explorer" }); // We'll navigate to explorer for now, as fetching by ID needs a hook
+    if (tx.result) navigate({ to: "/explorer" });
   };
 
   return (
@@ -115,7 +162,9 @@ function NewDagPage() {
               Submit a Task DAG <em className="italic text-accent">onchain.</em>
             </h1>
             <p className="text-muted-foreground mt-5 max-w-xl text-sm">
-              Define each node, its budget and dependencies. Submitting calls TaskDAG.submit() and locks total budget in MeshEscrow.sol via the wallet-connected SDK.
+              Define each node, its budget, schema commitments and dependencies.
+              Schema hashes are derived from your descriptions and committed permanently onchain —
+              the TEE judge resolves them to score agent output.
             </p>
           </div>
         </section>
@@ -130,12 +179,26 @@ function NewDagPage() {
               className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm"
             />
 
+            {/* Schema toggle */}
+            <div className="flex items-center gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowSchemas((v) => !v)}
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                {showSchemas ? "▾ Hide schema fields" : "▸ Show schema fields (input, output, rubric)"}
+              </button>
+              <span className="text-[10px] text-muted-foreground">
+                — Hashed onchain as your commitment to the TEE judge
+              </span>
+            </div>
+
             <div className="flex items-center justify-between mt-8 mb-3">
               <h2 className="font-display text-xl">Nodes</h2>
               <button onClick={add} className="btn-ghost !py-1.5 !px-3 text-xs">+ Add node</button>
             </div>
 
-            <ul className="space-y-3">
+            <ul className="space-y-4">
               {nodes.map((n, i) => (
                 <li key={n.id} className="border border-border/60 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-3">
@@ -154,6 +217,7 @@ function NewDagPage() {
                       Remove
                     </button>
                   </div>
+
                   <div className="grid sm:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-[10px] uppercase tracking-widest text-muted-foreground">Type</label>
@@ -196,6 +260,60 @@ function NewDagPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* ── Schema commitment fields ─────────────────────────────── */}
+                  {showSchemas && (
+                    <div className="mt-4 grid gap-3 border-t border-border/40 pt-4">
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Schema commitments — hashed with keccak256 and stored onchain
+                      </p>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                          Input schema
+                          <span className="ml-2 font-mono normal-case text-accent/60">
+                            {n.inputSchema.trim() ? schemaHash(n.inputSchema).slice(0, 12) + "…" : "default"}
+                          </span>
+                        </label>
+                        <textarea
+                          value={n.inputSchema}
+                          onChange={(e) => update(n.id, { inputSchema: e.target.value })}
+                          placeholder={`Describe what data this node receives.\ne.g. "JSON {topic: string, max_words: number}"`}
+                          rows={2}
+                          className="w-full bg-secondary/40 border border-border rounded-lg px-3 py-2 text-xs font-mono resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                          Output schema
+                          <span className="ml-2 font-mono normal-case text-accent/60">
+                            {n.outputSchema.trim() ? schemaHash(n.outputSchema).slice(0, 12) + "…" : "default"}
+                          </span>
+                        </label>
+                        <textarea
+                          value={n.outputSchema}
+                          onChange={(e) => update(n.id, { outputSchema: e.target.value })}
+                          placeholder={`Describe what this node must return.\ne.g. "Markdown string, max 500 words, with citations"`}
+                          rows={2}
+                          className="w-full bg-secondary/40 border border-border rounded-lg px-3 py-2 text-xs font-mono resize-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-widest text-muted-foreground mb-1">
+                          Quality rubric
+                          <span className="ml-2 font-mono normal-case text-accent/60">
+                            {n.qualityRubric.trim() ? schemaHash(n.qualityRubric).slice(0, 12) + "…" : "default"}
+                          </span>
+                        </label>
+                        <textarea
+                          value={n.qualityRubric}
+                          onChange={(e) => update(n.id, { qualityRubric: e.target.value })}
+                          placeholder={`How the TEE judge scores output (0–100).\ne.g. "Factual accuracy 60%, conciseness 30%, citations 10%"`}
+                          rows={2}
+                          className="w-full bg-secondary/40 border border-border rounded-lg px-3 py-2 text-xs font-mono resize-none"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -208,6 +326,12 @@ function NewDagPage() {
               <Row k="Total budget" v={`${totalBudget.toFixed(2)} OG`} />
               <Row k="Owner" v={address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Not connected"} />
               <Row k="Chain" v={isCorrectChain ? "0G Newton Mainnet" : "Wrong network — switch to 0G"} />
+              <Row
+                k="Schema commitments"
+                v={nodes.every((n) => n.inputSchema.trim() && n.outputSchema.trim() && n.qualityRubric.trim())
+                  ? "All defined ✓"
+                  : "Using label-derived defaults"}
+              />
             </dl>
             <div className="hairline my-5" />
             {!address ? (
@@ -219,17 +343,17 @@ function NewDagPage() {
             ) : (
               <button
                 onClick={submit}
-                disabled={!canSubmit || tx.status === "pending" || tx.status === "awaitingWallet"}
+                disabled={!canSubmit || tx.status === "confirming" || tx.status === "awaitingWallet"}
                 className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {tx.status === "awaitingWallet" ? "Confirm in wallet..."
-                  : tx.status === "pending" ? "Submitting..."
+                  : tx.status === "confirming" ? "Submitting..."
                   : `Lock ${totalBudget.toFixed(2)} OG & submit`}
               </button>
             )}
             <TxStatusPanel tx={tx} labels={{ confirming: "Locking budget in MeshEscrow", success: "Task DAG submitted onchain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
-              Calls TaskDAG.submit() then MeshEscrow.lock() in a single tx.
+              Schema hashes are keccak256 commitments. Pin content to 0G Storage to make them resolvable by TEE judges.
             </p>
           </aside>
         </section>
@@ -243,7 +367,7 @@ function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between gap-3">
       <dt className="text-muted-foreground">{k}</dt>
-      <dd className="font-mono text-right">{v}</dd>
+      <dd className="font-mono text-right text-xs">{v}</dd>
     </div>
   );
 }
