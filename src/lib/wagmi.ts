@@ -1,10 +1,19 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import {
+  connectorsForWallets,
+} from "@rainbow-me/rainbowkit";
+import {
+  rainbowWallet,
+  walletConnectWallet,
+  metaMaskWallet,
+  coinbaseWallet,
+  injectedWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { defineChain } from "viem";
-import { http } from "wagmi";
+import { createConfig, http } from "wagmi";
 
 const env = (import.meta as { env?: Record<string, string> }).env ?? {};
 
-const ZG_RPC = env.VITE_ZG_RPC_URL || "https://evmrpc.0g.ai";
+const ZG_RPC      = env.VITE_ZG_RPC_URL  || "https://evmrpc.0g.ai";
 const ZG_EXPLORER = env.VITE_ZG_EXPLORER || "https://chainscan.0g.ai";
 
 // ─── 0G Mainnet (Aleph) ──────────────────────────────────────────────────────
@@ -25,19 +34,57 @@ export const zgMainnet = defineChain({
 export const ZG_MAINNET_ID = zgMainnet.id; // 16661
 export const ZG_CHAIN_IDS  = [ZG_MAINNET_ID] as const;
 
-// ─── Wagmi config ─────────────────────────────────────────────────────────────
-// projectId MUST be a real WalletConnect Cloud id, otherwise the RainbowKit
-// modal hangs on the WC v2 relay handshake and the wallet list never renders.
-const projectId = env.VITE_WALLETCONNECT_PROJECT_ID || "";
+// ─── WalletConnect Project ID ─────────────────────────────────────────────────
+// A real UUIDv4 from https://cloud.reown.com (formerly WalletConnect Cloud).
+// If this is absent or a placeholder, WalletConnect is excluded from the wallet
+// list entirely so the modal does not hang waiting for the relay.
+const rawProjectId = env.VITE_WALLETCONNECT_PROJECT_ID ?? "";
 
-if (!projectId && typeof window !== "undefined") {
-  // Surface clearly in dev — empty id makes WC pairing hang silently.
-  console.warn("[wagmi] VITE_WALLETCONNECT_PROJECT_ID is not set. WalletConnect pairing will fail.");
+// A valid WalletConnect projectId is a 32-char hex UUID (no dashes).
+// Anything shorter or obviously fake is treated as "not configured".
+const isValidProjectId = rawProjectId.length >= 32 && rawProjectId !== "synapsemesh-local";
+
+if (!isValidProjectId && typeof window !== "undefined") {
+  console.warn(
+    "[wagmi] VITE_WALLETCONNECT_PROJECT_ID is missing or invalid. " +
+    "WalletConnect (MetaMask Mobile, Rainbow, etc.) will be hidden from the " +
+    "wallet modal. Get a free project ID at https://cloud.reown.com and add " +
+    "it to your .env file to enable mobile wallet support."
+  );
 }
 
-export const wagmiConfig = getDefaultConfig({
+export const walletConnectProjectId = isValidProjectId ? rawProjectId : "";
+
+// ─── Wallet list: conditionally include WalletConnect ─────────────────────────
+// injectedWallet   → MetaMask browser extension, Rabby, etc. (always available)
+// metaMaskWallet   → MetaMask deep-link for in-app browser (always available)
+// walletConnectWallet, rainbowWallet, coinbaseWallet → need a valid project ID
+const walletGroups = isValidProjectId
+  ? [
+      {
+        groupName: "Popular",
+        wallets: [metaMaskWallet, rainbowWallet, walletConnectWallet, coinbaseWallet],
+      },
+      {
+        groupName: "Other",
+        wallets: [injectedWallet],
+      },
+    ]
+  : [
+      {
+        groupName: "Browser wallets",
+        wallets: [metaMaskWallet, injectedWallet],
+      },
+    ];
+
+const connectors = connectorsForWallets(walletGroups, {
   appName: "SynapseMesh",
-  projectId: projectId || "synapsemesh-local",
+  projectId: walletConnectProjectId || "00000000000000000000000000000000", // placeholder never reaches WC relay
+});
+
+// ─── Wagmi config ─────────────────────────────────────────────────────────────
+export const wagmiConfig = createConfig({
+  connectors,
   chains: [zgMainnet],
   transports: {
     [zgMainnet.id]: http(ZG_RPC),
