@@ -221,10 +221,10 @@ console.log("DAG Submitted, root hash:", receipt.logs[0].topics[1]);
 
 // 5. Listen to Live TEE Verification Streams
 mesh.events.onVerificationSubmitted((taskId, agentAddress, score, payout) => {
-  console.log(`✅ Task Verified!`);
-  console.log(`Agent: ${agentAddress}`);
-  console.log(`Score: ${score}/100`);
-  console.log(`Payout: ${ethers.formatEther(payout)} OG`);
+  console.log("✅ Task Verified!");
+  console.log("Agent: " + agentAddress);
+  console.log("Score: " + score + "/100");
+  console.log("Payout: " + ethers.formatEther(payout) + " OG");
 });`}</pre>
             </Section>
 
