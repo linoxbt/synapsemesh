@@ -29,11 +29,12 @@ const fs = require('fs');
 const RPC_URL            = process.env.RPC_URL;
 const AGENT_REGISTRY     = process.env.AGENT_REGISTRY;
 const TASK_DAG_REGISTRY  = process.env.TASK_DAG_REGISTRY;
+const BID_ENGINE         = process.env.BID_ENGINE;
 const TEE_VERIFIER_BRIDGE = process.env.TEE_VERIFIER_BRIDGE;
 const TRUSTED_SIGNER_KEY = process.env.TRUSTED_SIGNER_KEY; // Required — signs TEE attestations
 
-if (!RPC_URL || !AGENT_REGISTRY || !TASK_DAG_REGISTRY || !TEE_VERIFIER_BRIDGE) {
-  console.error('❌ Missing required env vars. Check .env for RPC_URL, AGENT_REGISTRY, TASK_DAG_REGISTRY, TEE_VERIFIER_BRIDGE');
+if (!RPC_URL || !AGENT_REGISTRY || !TASK_DAG_REGISTRY || !BID_ENGINE || !TEE_VERIFIER_BRIDGE) {
+  console.error('❌ Missing required env vars. Check .env for RPC_URL, AGENT_REGISTRY, TASK_DAG_REGISTRY, BID_ENGINE, TEE_VERIFIER_BRIDGE');
   process.exit(1);
 }
 if (!TRUSTED_SIGNER_KEY) {
@@ -57,7 +58,15 @@ const DAG_REG_ABI = [
   'function getNode(bytes32 taskId) view returns (tuple(bytes32 taskId, bytes32 inputSchemaHash, bytes32 outputSchemaHash, bytes32 qualityRubricHash, bytes32[] dependsOn, uint8 nodeType, uint256 maxBudget, uint256 timeoutBlocks, address assignedAgent, uint8 status, uint256 assignedAt, uint256 completedAt))',
   'function getNodeStatus(bytes32 taskId) view returns (uint8)',
   'function dependenciesMet(bytes32 taskId) view returns (bool)',
-  'function markNodeAssigned(bytes32 taskId, address agent)',
+];
+
+// BidEngine — the only contract allowed to call TaskDAGRegistry.markNodeAssigned.
+// Agents bid here; the off-chain auctioneer (scripts/auctioneer.mjs) scores and
+// calls awardBid, which emits BidAwarded the agents listen for.
+const BID_ENGINE_ABI = [
+  'function submitBid(bytes32 taskId, uint256 price, uint256 eta) external',
+  'event BidSubmitted(bytes32 indexed taskId, address agent, uint256 price, uint256 eta)',
+  'event BidAwarded(bytes32 indexed taskId, address winner, uint256 price)',
 ];
 
 const TEE_BRIDGE_ABI = [
@@ -124,6 +133,7 @@ async function startAgent(agentConfig, trustedSigner) {
   const wallet    = new ethers.Wallet(agentConfig.privateKey, provider);
   const agentReg  = new ethers.Contract(AGENT_REGISTRY, AGENT_REG_ABI, wallet);
   const dagReg    = new ethers.Contract(TASK_DAG_REGISTRY, DAG_REG_ABI, wallet);
+  const bidEngine = new ethers.Contract(BID_ENGINE, BID_ENGINE_ABI, wallet);
   const teeBridge = new ethers.Contract(TEE_VERIFIER_BRIDGE, TEE_BRIDGE_ABI, wallet);
 
   const log = (msg) => console.log(`[${agentConfig.name}] ${msg}`);
@@ -156,10 +166,47 @@ async function startAgent(agentConfig, trustedSigner) {
   ]);
   log(`TEE enclave: ${mrEnclave.slice(0, 10)}… | MIN_QUALITY: ${minQuality}`);
 
-  // Set to track which taskIds this agent is currently working on to avoid double-processing
-  const inFlight = new Set();
+  // Tracks taskIds where this agent has an open bid (between submitBid and BidAwarded).
+  // Value carries the data needed to execute on win and a watchdog that gives up if the
+  // auctioneer never settles.
+  const myBids = new Map(); // taskId => { dropTimer }
 
-  // ── Step 2: Handle a DAG ─────────────────────────────────────────────────────
+  // Bid parameters (per project-owner spec).
+  const BID_PRICE = ethers.parseEther('0.01'); // 0.01 OG
+  const BID_ETA   = 30n;                       // 30 seconds estimate
+  // If no BidAwarded arrives within this window, abandon the bid so the slot
+  // can be retried via polling. Longer than the auctioneer's 10s collection
+  // window plus generous RPC latency.
+  const BID_AWARD_TIMEOUT_MS = 60_000;
+
+  // ── Execute work + submit TEE attestation (only called after auction win) ───
+  async function executeAndAttest(taskId) {
+    try {
+      // Simulate execution latency (replace with real LLM/tool call in production)
+      await sleep(500 + Math.floor(Math.random() * 500));
+
+      const score  = deriveTeeScore(taskId, wallet.address);
+      const passed = score >= Number(minQuality);
+
+      log(`Work complete — score: ${score}/100 passed: ${passed}`);
+
+      const teeSignature = await buildTeeSignature(trustedSigner, taskId, passed, score, mrEnclave);
+
+      const verifyTx = await teeBridge.submitVerification(
+        taskId,
+        wallet.address,
+        passed,
+        score,
+        teeSignature
+      );
+      await verifyTx.wait();
+      log(`✅ Verification submitted! Score: ${score} | Payout released.`);
+    } catch (verifyErr) {
+      err(`Verification failed: ${verifyErr.shortMessage || verifyErr.message}`);
+    }
+  }
+
+  // ── Handle a DAG: enumerate eligible nodes and submit bids ──────────────────
   async function handleDag(dagRoot) {
     log(`New DAG detected: ${dagRoot}`);
 
@@ -179,12 +226,12 @@ async function startAgent(agentConfig, trustedSigner) {
     log(`DAG has ${taskIds.length} node(s). Checking eligibility…`);
 
     for (const taskId of taskIds) {
-      if (inFlight.has(taskId)) continue;
+      if (myBids.has(taskId)) continue;
 
       const eligible = await isEligibleForNode(dagReg, taskId, wallet.address);
       if (!eligible) continue;
 
-      // Fetch full node to check budget and type
+      // Fetch full node to surface type/budget in logs (and skip if processed).
       let node;
       try {
         node = await dagReg.getNode(taskId);
@@ -196,63 +243,55 @@ async function startAgent(agentConfig, trustedSigner) {
       const budgetOG = Number(ethers.formatEther(node.maxBudget));
       log(`Node ${taskId.slice(0, 10)}… — type: ${node.nodeType}, budget: ${budgetOG.toFixed(3)} OG`);
 
-      // Guard: skip if already processed by TEE bridge
       try {
         const processed = await teeBridge.isProcessed(taskId);
         if (processed) { log(`Node already verified, skipping.`); continue; }
       } catch { /* continue */ }
 
-      // ── Step 3: Claim the node via markNodeAssigned ──────────────────────────
-      // In the full BidEngine flow, the BidEngine contract calls markNodeAssigned
-      // after selecting the winning bid. For agents running without a BidEngine
-      // deployment, they call it directly — the contract restricts this to the
-      // bidEngine address, so this will revert unless the agent IS the bidEngine
-      // or the contract owner has granted permission.
-      inFlight.add(taskId);
+      // ── Submit bid via BidEngine. The auctioneer service collects bids,
+      //    scores them, and calls awardBid → BidAwarded fires → we execute. ──
       try {
-        log(`Bidding on node ${taskId.slice(0, 10)}…`);
-        const bidTx = await dagReg.markNodeAssigned(taskId, wallet.address);
+        log(`Bidding on ${taskId.slice(0, 10)}… price=${ethers.formatEther(BID_PRICE)} OG eta=${BID_ETA}`);
+        const bidTx = await bidEngine.submitBid(taskId, BID_PRICE, BID_ETA);
         await bidTx.wait();
-        log(`Node assigned ✓ — executing work…`);
       } catch (bidErr) {
-        // BidEngine reversion is expected when contract requires BidEngine auth.
-        // Log clearly and skip rather than crashing.
-        log(`Bid rejected by contract (BidEngine required or node taken): ${bidErr.shortMessage || bidErr.message}`);
-        inFlight.delete(taskId);
+        log(`submitBid rejected: ${bidErr.shortMessage || bidErr.message}`);
         continue;
       }
 
-      // ── Step 4: Execute work & submit TEE verification ───────────────────────
-      try {
-        // Simulate execution latency (replace with real LLM/tool call in production)
-        await sleep(500 + Math.floor(Math.random() * 500));
-
-        const score  = deriveTeeScore(taskId, wallet.address);
-        const passed = score >= Number(minQuality);
-
-        log(`Work complete — score: ${score}/100 passed: ${passed}`);
-
-        // Build TEE attestation signature using trusted signer key
-        const teeSignature = await buildTeeSignature(trustedSigner, taskId, passed, score, mrEnclave);
-
-        const verifyTx = await teeBridge.submitVerification(
-          taskId,
-          wallet.address,
-          passed,
-          score,
-          teeSignature
-        );
-        await verifyTx.wait();
-        log(`✅ Verification submitted! Score: ${score} | Payout released.`);
-      } catch (verifyErr) {
-        err(`Verification failed: ${verifyErr.shortMessage || verifyErr.message}`);
-      } finally {
-        inFlight.delete(taskId);
-      }
+      // Register the open bid + a watchdog that abandons it if BidAwarded
+      // never arrives (auctioneer down, RPC dropped the event, etc.).
+      const dropTimer = setTimeout(() => {
+        if (myBids.delete(taskId)) {
+          log(`Bid award timed out for ${taskId.slice(0, 10)}… (auctioneer silent)`);
+        }
+      }, BID_AWARD_TIMEOUT_MS);
+      myBids.set(taskId, { dropTimer });
+      log(`Bid placed — awaiting BidAwarded for ${taskId.slice(0, 10)}…`);
     }
   }
 
-  // ── Step 3: Subscribe to new DAGs ───────────────────────────────────────────
+  // ── BidAwarded listener: only execute when WE are the winner ────────────────
+  bidEngine.on('BidAwarded', async (taskId, winner /* , price */) => {
+    const entry = myBids.get(taskId);
+    if (!entry) return; // not a bid we placed
+    clearTimeout(entry.dropTimer);
+    myBids.delete(taskId);
+
+    if (winner.toLowerCase() !== wallet.address.toLowerCase()) {
+      log(`Lost auction for ${taskId.slice(0, 10)}… (winner ${winner.slice(0, 8)}…)`);
+      return;
+    }
+
+    log(`Won auction for ${taskId.slice(0, 10)}… — executing`);
+    try {
+      await executeAndAttest(taskId);
+    } catch (e) {
+      err(`Post-win execution failed: ${e.message}`);
+    }
+  });
+
+  // ── Subscribe to new DAGs (primary path; ethers polls under HTTP) ───────────
   dagReg.on('DAGSubmitted', async (dagRoot, _requester, _nodeCount, _budget) => {
     try {
       await handleDag(dagRoot);
@@ -261,16 +300,35 @@ async function startAgent(agentConfig, trustedSigner) {
     }
   });
 
-  // Also listen for NodeStatusChanged to pick up nodes that become unblocked
-  // after a dependency is settled (PARALLEL/REDUCE patterns)
-  dagReg.on('NodeStatusChanged', async (taskId, newStatus) => {
-    if (Number(newStatus) !== NodeStatus.SETTLED) return;
-    // Re-scan — a settled node may have unblocked downstream nodes.
-    // We don't know the dagRoot here so we try the taskId as root (no-op if wrong)
-    // and rely on the next DAGSubmitted event for new work.
-  });
+  // ── Polling fallback for DAGSubmitted ───────────────────────────────────────
+  // Every 30s, sweep DAGSubmitted logs from the last scanned block forward.
+  // Catches DAGs missed by the subscription if the underlying connection
+  // dropped. handleDag is idempotent (myBids + on-chain getNodeStatus filter
+  // already-bidded/already-assigned nodes), so re-processing is safe.
+  let lastScannedBlock = await provider.getBlockNumber().catch(() => 0n);
+  const POLL_INTERVAL_MS = 30_000;
+  setInterval(async () => {
+    try {
+      const head = await provider.getBlockNumber();
+      if (BigInt(head) <= BigInt(lastScannedBlock)) return;
+      const events = await dagReg.queryFilter(
+        dagReg.filters.DAGSubmitted(),
+        Number(lastScannedBlock) + 1,
+        Number(head),
+      );
+      lastScannedBlock = head;
+      if (events.length === 0) return;
+      log(`[poll] ${events.length} DAGSubmitted event(s) since last sweep`);
+      for (const ev of events) {
+        try { await handleDag(ev.args.dagRoot); }
+        catch (e) { err(`[poll] handleDag failed: ${e.message}`); }
+      }
+    } catch (e) {
+      err(`[poll] sweep failed: ${e.shortMessage || e.message}`);
+    }
+  }, POLL_INTERVAL_MS);
 
-  log('Listening for DAGSubmitted events…');
+  log('Listening for DAGSubmitted (sub + 30s poll) and BidAwarded…');
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
