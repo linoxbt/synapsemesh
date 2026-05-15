@@ -54,6 +54,45 @@ function schemaHash(content: string): `0x${string}` {
   return keccak256(toHex(content.trim()));
 }
 
+/**
+ * Kahn topological sort over node labels. Returns nodes reordered so that each
+ * node's deps appear strictly earlier in the array — the exact ordering
+ * TaskDAGRegistry._validateNoCycles requires. Throws on cycle.
+ */
+function topoSortNodes(ns: DraftNode[]): DraftNode[] {
+  const byLabel = new Map(ns.map((n) => [n.label, n]));
+  const indeg = new Map<string, number>(ns.map((n) => [n.label, 0]));
+  const adj = new Map<string, string[]>(ns.map((n) => [n.label, []]));
+
+  for (const n of ns) {
+    for (const dep of n.deps) {
+      if (!byLabel.has(dep)) throw new Error(`Node "${n.label}" depends on unknown node "${dep}"`);
+      adj.get(dep)!.push(n.label);
+      indeg.set(n.label, (indeg.get(n.label) ?? 0) + 1);
+    }
+  }
+
+  const queue: string[] = [];
+  for (const [label, d] of indeg) if (d === 0) queue.push(label);
+
+  const ordered: DraftNode[] = [];
+  while (queue.length) {
+    const label = queue.shift()!;
+    ordered.push(byLabel.get(label)!);
+    for (const next of adj.get(label) ?? []) {
+      const d = (indeg.get(next) ?? 0) - 1;
+      indeg.set(next, d);
+      if (d === 0) queue.push(next);
+    }
+  }
+
+  if (ordered.length !== ns.length) {
+    const remaining = ns.filter((n) => !ordered.includes(n)).map((n) => n.label).join(", ");
+    throw new Error(`Cycle detected in dependencies: ${remaining}`);
+  }
+  return ordered;
+}
+
 function NewDagPage() {
   const { address, connect, isCorrectChain, switchToZg } = useWallet();
   const navigate = useNavigate();
@@ -74,6 +113,36 @@ function NewDagPage() {
 
   const totalBudget = nodes.reduce((s, n) => s + (Number(n.budget) || 0), 0);
   const labels = nodes.map((n) => n.label).filter(Boolean);
+
+  // BFS over deps to detect whether targetLabel can reach sourceLabel —
+  // used both for a UX guard ("disable dep chip that would close a cycle")
+  // and for a live cycle warning on the summary card.
+  const hasCycleThrough = (sourceLabel: string, targetLabel: string): boolean => {
+    if (sourceLabel === targetLabel) return true;
+    const adj = new Map<string, string[]>();
+    for (const n of nodes) adj.set(n.label, n.deps.slice());
+    // Temporarily add the proposed edge: source depends on target
+    adj.set(sourceLabel, [...(adj.get(sourceLabel) ?? []), targetLabel]);
+    const seen = new Set<string>();
+    const stack = [sourceLabel];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      for (const next of adj.get(cur) ?? []) {
+        if (next === sourceLabel) return true;
+        stack.push(next);
+      }
+    }
+    return false;
+  };
+
+  let cycleError: string | null = null;
+  try {
+    topoSortNodes(nodes);
+  } catch (e) {
+    cycleError = (e as Error).message;
+  }
 
   const update = (id: string, patch: Partial<DraftNode>) =>
     setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, ...patch } : n)));
@@ -99,7 +168,8 @@ function NewDagPage() {
     title.trim().length > 0 &&
     nodes.length > 0 &&
     nodes.every((n) => n.label.trim() && n.budget > 0) &&
-    new Set(labels).size === labels.length;
+    new Set(labels).size === labels.length &&
+    !cycleError;
 
   const { writeContractAsync } = useWriteContract();
   const tx = useTxLifecycle<string>();
@@ -115,7 +185,12 @@ function NewDagPage() {
       const getTaskId = (label: string): `0x${string}` =>
         keccak256(toHex(`${dagRoot}-${label.trim()}`));
 
-      const taskNodes = nodes.map((n) => ({
+      // The contract's _validateNoCycles requires every dependsOn reference to
+      // appear earlier in the array. Sort the user's nodes topologically (and
+      // surface cycles as a wallet-side error) before sending the tx.
+      const ordered = topoSortNodes(nodes);
+
+      const taskNodes = ordered.map((n) => ({
         taskId: getTaskId(n.label),
 
         // Real schema commitments derived from user input.
@@ -243,12 +318,17 @@ function NewDagPage() {
                       <div className="mt-1 flex flex-wrap gap-1">
                         {nodes.filter((m) => m.id !== n.id && m.label.trim()).map((m) => {
                           const on = n.deps.includes(m.label);
+                          // Adding this edge (n depends on m) would create a cycle iff
+                          // m can already reach n via existing deps.
+                          const wouldCycle = !on && hasCycleThrough(n.label, m.label);
                           return (
                             <button
                               key={m.id}
                               type="button"
+                              disabled={wouldCycle}
+                              title={wouldCycle ? "Would create a dependency cycle" : undefined}
                               onClick={() => update(n.id, { deps: on ? n.deps.filter((d) => d !== m.label) : [...n.deps, m.label] })}
-                              className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-colors ${
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded-full border transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                                 on ? "border-accent text-accent bg-accent/5" : "border-border/60 text-muted-foreground hover:text-foreground"
                               }`}
                             >
@@ -333,6 +413,9 @@ function NewDagPage() {
                   : "Using label-derived defaults"}
               />
             </dl>
+            {cycleError && (
+              <p className="mt-3 text-[11px] text-destructive">{cycleError}</p>
+            )}
             <div className="hairline my-5" />
             {!address ? (
               <button onClick={connect} className="btn-primary w-full">Connect wallet</button>
