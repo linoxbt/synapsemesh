@@ -12,6 +12,11 @@ const ZG_EXPLORER = ENV.VITE_ZG_EXPLORER || "https://chainscan.0g.ai";
 
 // 0G Aristotle Mainnet — id 16661, native token OG.
 // Confirmed against https://evmrpc.0g.ai (the production mainnet RPC).
+//
+// Multicall3 is deployed at the canonical cross-chain address on 0G.
+// Without this entry, viem's publicClient.multicall() throws
+// `ChainDoesNotSupportContract` and every batched on-chain query (live
+// agents, live DAGs, etc.) silently fails, leaving the dashboard at zero.
 export const zgMainnet = defineChain({
   id: 16661,
   name: "0G Aristotle Mainnet",
@@ -22,6 +27,9 @@ export const zgMainnet = defineChain({
   },
   blockExplorers: {
     default: { name: "0G Explorer", url: ZG_EXPLORER },
+  },
+  contracts: {
+    multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" },
   },
 });
 
