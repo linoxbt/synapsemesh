@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
-import { usePublicClient, type UsePublicClientReturnType } from 'wagmi';
-import { parseAbiItem, hexToString, formatEther, type Address, type AbiEvent } from 'viem';
-import { CONTRACT_ADDRESSES, AGENT_REGISTRY_ABI, TASK_DAG_REGISTRY_ABI } from './contracts';
+import { useQuery } from "@tanstack/react-query";
+import { usePublicClient, type UsePublicClientReturnType } from "wagmi";
+import { parseAbiItem, hexToString, formatEther, type Address, type AbiEvent } from "viem";
+import { CONTRACT_ADDRESSES, AGENT_REGISTRY_ABI, TASK_DAG_REGISTRY_ABI } from "./contracts";
 
 // ─── Indexing window ──────────────────────────────────────────────────────────
 // Querying eth_getLogs from block 0 on a public RPC against a 33M-block chain
@@ -9,8 +9,8 @@ import { CONTRACT_ADDRESSES, AGENT_REGISTRY_ABI, TASK_DAG_REGISTRY_ABI } from '.
 // and freezing the UI. We instead scan a bounded recent window in chunks.
 const env = (import.meta as { env?: Record<string, string> }).env ?? {};
 const INDEX_FROM_BLOCK = env.VITE_INDEX_FROM_BLOCK ? BigInt(env.VITE_INDEX_FROM_BLOCK) : null;
-const LOOKBACK_BLOCKS  = BigInt(env.VITE_INDEX_LOOKBACK_BLOCKS || '200000');
-const CHUNK            = BigInt(env.VITE_INDEX_CHUNK_BLOCKS || '5000');
+const LOOKBACK_BLOCKS = BigInt(env.VITE_INDEX_LOOKBACK_BLOCKS || "200000");
+const CHUNK = BigInt(env.VITE_INDEX_CHUNK_BLOCKS || "5000");
 
 type Client = NonNullable<UsePublicClientReturnType>;
 
@@ -19,11 +19,14 @@ async function getLogsWindowed(
   args: { address: Address; event: AbiEvent; eventArgs?: Record<string, unknown> },
 ) {
   const head = await client.getBlockNumber();
-  const start = INDEX_FROM_BLOCK !== null
-    ? INDEX_FROM_BLOCK
-    : head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
+  const start =
+    INDEX_FROM_BLOCK !== null
+      ? INDEX_FROM_BLOCK
+      : head > LOOKBACK_BLOCKS
+        ? head - LOOKBACK_BLOCKS
+        : 0n;
 
-  const out: Awaited<ReturnType<Client['getLogs']>> = [];
+  const out: Awaited<ReturnType<Client["getLogs"]>> = [];
   for (let from = start; from <= head; from += CHUNK) {
     const to = from + CHUNK - 1n > head ? head : from + CHUNK - 1n;
     try {
@@ -57,14 +60,25 @@ export type LiveAgent = {
 };
 
 const AGENT_REGISTERED = parseAbiItem(
-  'event AgentRegistered(address indexed agent, bytes32 agentId, uint256 stake)'
+  "event AgentRegistered(address indexed agent, bytes32 agentId, uint256 stake)",
 );
+
+function getAgentLabel(agentId: `0x${string}`, owner: string) {
+  try {
+    const decoded = hexToString(agentId).replace(/\0/g, "").trim();
+    if (/^[\x20-\x7E]+$/.test(decoded) && decoded.length > 0) return decoded;
+  } catch {
+    // AgentRegistry stores keccak256(name) for current registrations, so most
+    // agent IDs are opaque hashes rather than UTF-8 names.
+  }
+  return `Agent ${owner.slice(0, 6)}...${owner.slice(-4)}`;
+}
 
 export function useLiveAgents() {
   const publicClient = usePublicClient();
 
   return useQuery({
-    queryKey: ['liveAgents'],
+    queryKey: ["liveAgents"],
     queryFn: async (): Promise<LiveAgent[]> => {
       if (!publicClient) return [];
       const registryAddress = CONTRACT_ADDRESSES.agentRegistry as Address;
@@ -86,7 +100,7 @@ export function useLiveAgents() {
       const calls = addrs.map((address) => ({
         address: registryAddress,
         abi: AGENT_REGISTRY_ABI,
-        functionName: 'getAgent',
+        functionName: "getAgent",
         args: [address],
       }));
 
@@ -94,15 +108,20 @@ export function useLiveAgents() {
 
       const agents: LiveAgent[] = [];
       results.forEach((res, i) => {
-        if (res.status === 'success' && res.result) {
+        if (res.status === "success" && res.result) {
           const agentData = res.result as {
-            owner: string; agentId: `0x${string}`; stakedAmount: bigint;
-            reputation: bigint; tasksCompleted: bigint; totalEarned: bigint;
-            slashed: boolean; active: boolean;
+            owner: string;
+            agentId: `0x${string}`;
+            stakedAmount: bigint;
+            reputation: bigint;
+            tasksCompleted: bigint;
+            totalEarned: bigint;
+            slashed: boolean;
+            active: boolean;
           };
           const address = addrs[i];
-          const rawName = hexToString(agentData.agentId).replace(/\0/g, '');
-          const op = rawName.split('-')[0] || 'Custom';
+          const rawName = getAgentLabel(agentData.agentId, address);
+          const op = rawName.split("-")[0] || "Custom";
           agents.push({
             id: address,
             name: rawName,
@@ -136,14 +155,14 @@ export type LiveDAG = {
 };
 
 const DAG_SUBMITTED = parseAbiItem(
-  'event DAGSubmitted(bytes32 indexed dagRoot, address requester, uint256 nodeCount, uint256 budget)'
+  "event DAGSubmitted(bytes32 indexed dagRoot, address requester, uint256 nodeCount, uint256 budget)",
 );
 
 export function useLiveDAGs() {
   const publicClient = usePublicClient();
 
   return useQuery({
-    queryKey: ['liveDAGs'],
+    queryKey: ["liveDAGs"],
     queryFn: async (): Promise<LiveDAG[]> => {
       if (!publicClient) return [];
       const dagRegAddress = CONTRACT_ADDRESSES.taskDagRegistry as Address;
@@ -165,7 +184,7 @@ export function useLiveDAGs() {
       const calls = roots.map((root) => ({
         address: dagRegAddress,
         abi: TASK_DAG_REGISTRY_ABI,
-        functionName: 'getDAG',
+        functionName: "getDAG",
         args: [root],
       }));
 
@@ -173,10 +192,14 @@ export function useLiveDAGs() {
 
       const dags: LiveDAG[] = [];
       results.forEach((res, i) => {
-        if (res.status === 'success' && res.result) {
+        if (res.status === "success" && res.result) {
           const dagData = res.result as {
-            dagRoot: string; requester: string; totalBudget: bigint;
-            submittedAt: bigint; nodeCount: bigint; complete: boolean;
+            dagRoot: string;
+            requester: string;
+            totalBudget: bigint;
+            submittedAt: bigint;
+            nodeCount: bigint;
+            complete: boolean;
           };
           const root = roots[i];
           const shortRoot = `${root.slice(0, 10)}...${root.slice(-4)}`;
@@ -217,7 +240,7 @@ const NODE_TYPES = ["SEQUENTIAL", "PARALLEL", "CONDITIONAL", "REDUCE"];
 const STATUS_MAP = ["Pending", "Bidding", "Executing", "Executing", "Settled", "Failed"];
 
 const VERIFICATION_SUBMITTED = parseAbiItem(
-  "event VerificationSubmitted(bytes32 indexed taskId, address indexed agent, uint8 score, uint256 payout)"
+  "event VerificationSubmitted(bytes32 indexed taskId, address indexed agent, uint8 score, uint256 payout)",
 );
 
 export function useDAGDetails(dagRoot: string) {
@@ -231,14 +254,18 @@ export function useDAGDetails(dagRoot: string) {
       const dagRegAddress = CONTRACT_ADDRESSES.taskDagRegistry as Address;
       const teeAddress = CONTRACT_ADDRESSES.teeVerifierBridge as Address;
 
-      const rawNodes = await publicClient.readContract({
+      const rawNodes = (await publicClient.readContract({
         address: dagRegAddress,
         abi: TASK_DAG_REGISTRY_ABI,
         functionName: "getDAGNodes",
         args: [dagRoot],
-      }) as Array<{
-        taskId: string; nodeType: number; status: number;
-        maxBudget: bigint; assignedAgent: string; dependsOn: readonly string[];
+      })) as Array<{
+        taskId: string;
+        nodeType: number;
+        status: number;
+        maxBudget: bigint;
+        assignedAgent: string;
+        dependsOn: readonly string[];
       }>;
 
       const logs = await getLogsWindowed(publicClient, {
@@ -248,7 +275,8 @@ export function useDAGDetails(dagRoot: string) {
 
       const verifications = new Map<string, { score: number; payout: number }>();
       logs.forEach((l) => {
-        const a = (l as unknown as { args: { taskId?: string; score?: number; payout?: bigint } }).args;
+        const a = (l as unknown as { args: { taskId?: string; score?: number; payout?: bigint } })
+          .args;
         if (a.taskId && a.score !== undefined && a.payout !== undefined) {
           verifications.set(a.taskId, {
             score: Number(a.score),
@@ -311,7 +339,12 @@ export function useAgentAttestations(agentAddress: string) {
 
       return logs
         .map((l) => {
-          const a = (l as unknown as { args: { taskId?: string; score?: number; payout?: bigint }; blockNumber: bigint }).args;
+          const a = (
+            l as unknown as {
+              args: { taskId?: string; score?: number; payout?: bigint };
+              blockNumber: bigint;
+            }
+          ).args;
           const blockNumber = Number((l as unknown as { blockNumber: bigint }).blockNumber);
           return {
             taskId: a.taskId as string,
@@ -344,7 +377,11 @@ export function useGlobalSettlements() {
 
       return logs
         .map((l) => {
-          const a = (l as unknown as { args: { taskId?: string; agent?: string; score?: number; payout?: bigint } }).args;
+          const a = (
+            l as unknown as {
+              args: { taskId?: string; agent?: string; score?: number; payout?: bigint };
+            }
+          ).args;
           const blockNumber = Number((l as unknown as { blockNumber: bigint }).blockNumber);
           return {
             taskId: a.taskId as string,
