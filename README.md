@@ -264,10 +264,10 @@ All contracts deployed on **0G Galileo Testnet (Chain ID: 80084)**
 
 | Resource | Link |
 |---|---|
-| Live App | [INSERT LIVE URL] |
+| Live App | [https://synapsemesh.vercel.app/] |
 | Demo Video (3–5 min) | [INSERT VIDEO URL] |
 | Pitch Video | [INSERT PITCH URL] |
-| GitHub Repository | [INSERT GITHUB URL] |
+| GitHub Repository | [https://github.com/linoxbt/synapsemesh/] |
 
 ---
 
@@ -372,9 +372,9 @@ Add this network manually in MetaMask:
 | Currency Symbol | A0GI |
 | Explorer | https://chainscan-galileo.0g.ai |
 
-### 8. Get Testnet Tokens
+### 8. Get free Tokens to test the app on 0G mainnet 
 
-Visit [https://faucet.0g.ai](https://faucet.0g.ai) and request A0GI testnet tokens.  
+Visit [https://synapsemeshfaucet.vercel.app/](https://synapsemeshfaucet.vercel.app/) and request A0GI testnet tokens.  
 Minimum needed to interact: **0.1 A0GI**
 
 ---
