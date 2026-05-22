@@ -183,8 +183,8 @@ Explorer: https://chainscan.0g.ai`}</pre>
               <p>Every write surface flows through a single <code>useTxLifecycle</code> hook with four states:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li><b>awaitingWallet</b> - request is in the wallet, waiting for user signature.</li>
-                <li><b>pending</b> - tx broadcast, waiting for inclusion.</li>
-                <li><b>success</b> - hash and explorer link surfaced; CTA flips to <i>Open in explorer</i>.</li>
+                <li><b>confirming</b> - tx broadcast, waiting for one onchain confirmation.</li>
+                <li><b>success</b> - receipt confirmed and explorer link surfaced.</li>
                 <li><b>error</b> - human-readable reason, including user rejection (code 4001).</li>
               </ul>
             </Section>

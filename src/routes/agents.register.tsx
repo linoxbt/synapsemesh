@@ -139,10 +139,10 @@ function RegisterAgentPage() {
               <button onClick={goToAgent} className="btn-primary w-full">Open agent profile -&gt;</button>
             ) : (
               <button onClick={submit}
-                disabled={!canSubmit || tx.status === "pending" || tx.status === "awaitingWallet"}
+                disabled={!canSubmit || tx.status === "confirming" || tx.status === "awaitingWallet"}
                 className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed">
                 {tx.status === "awaitingWallet" ? "Confirm in wallet..."
-                  : tx.status === "pending" ? "Minting..."
+                  : tx.status === "confirming" ? "Minting..."
                   : `Stake ${stake} OG & mint INFT`}
               </button>
             )}

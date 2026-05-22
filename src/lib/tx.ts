@@ -11,9 +11,14 @@
 //   - explorerUrl is derived from the real txHash once available.
 
 import { useCallback, useState } from "react";
+import { usePublicClient } from "wagmi";
 import { explorerTx, ZG_EXPLORER } from "./chainStream";
 
 export type TxStatus = "idle" | "awaitingWallet" | "confirming" | "success" | "error";
+
+export type TxRunResult<T> =
+  | { status: "success"; txHash: string; result: T }
+  | { status: "error"; txHash: string | null; error: string };
 
 export interface TxLifecycle<T> {
   /** Current state of the transaction lifecycle. */
@@ -27,7 +32,7 @@ export interface TxLifecycle<T> {
   /** Full 0G Chain explorer URL for the tx hash, or null. */
   explorerUrl: string | null;
   /** Execute a contract write. fn MUST call writeContractAsync and return its hash. */
-  run: (fn: () => Promise<{ txHash: string; result: T }>) => Promise<void>;
+  run: (fn: () => Promise<{ txHash: string; result: T }>) => Promise<TxRunResult<T>>;
   /** Reset all state back to idle. */
   reset: () => void;
 }
@@ -42,7 +47,10 @@ function parseError(e: unknown): string {
   const err = e as Record<string, unknown>;
 
   // User explicitly rejected in wallet (EIP-1193 code 4001)
-  if (err.code === 4001 || (err as { shortMessage?: string }).shortMessage?.includes("User rejected")) {
+  if (
+    err.code === 4001 ||
+    (err as { shortMessage?: string }).shortMessage?.includes("User rejected")
+  ) {
     return "Transaction rejected in wallet.";
   }
 
@@ -62,10 +70,11 @@ function parseError(e: unknown): string {
 }
 
 export function useTxLifecycle<T>(): TxLifecycle<T> {
-  const [status, setStatus]   = useState<TxStatus>("idle");
-  const [txHash, setTxHash]   = useState<string | null>(null);
-  const [error, setError]     = useState<string | null>(null);
-  const [result, setResult]   = useState<T | null>(null);
+  const publicClient = usePublicClient();
+  const [status, setStatus] = useState<TxStatus>("idle");
+  const [txHash, setTxHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<T | null>(null);
 
   const reset = useCallback(() => {
     setStatus("idle");
@@ -74,31 +83,50 @@ export function useTxLifecycle<T>(): TxLifecycle<T> {
     setResult(null);
   }, []);
 
-  const run = useCallback(async (fn: () => Promise<{ txHash: string; result: T }>) => {
-    // Clear any previous state
-    setStatus("awaitingWallet");
-    setError(null);
-    setTxHash(null);
-    setResult(null);
+  const run = useCallback(
+    async (fn: () => Promise<{ txHash: string; result: T }>) => {
+      // Clear any previous state
+      setStatus("awaitingWallet");
+      setError(null);
+      setTxHash(null);
+      setResult(null);
+      let broadcastHash: string | null = null;
 
-    try {
-      // fn() opens the wallet modal and waits for the user to sign.
-      // This is the "awaitingWallet" phase — do NOT flip to confirming yet.
-      const { txHash: hash, result: r } = await fn();
+      try {
+        // fn() opens the wallet modal and waits for the user to sign.
+        // This is the "awaitingWallet" phase — do NOT flip to confirming yet.
+        const { txHash: hash, result: r } = await fn();
+        broadcastHash = hash;
 
-      // Wallet signed — tx is now broadcast. Flip to confirming.
-      setTxHash(hash);
-      setStatus("confirming");
+        // Wallet signed — tx is now broadcast. Flip to confirming.
+        setTxHash(hash);
+        setStatus("confirming");
 
-      // fn() already awaited the receipt (writeContractAsync returns after broadcast).
-      // Set result and complete.
-      setResult(r);
-      setStatus("success");
-    } catch (e) {
-      setError(parseError(e));
-      setStatus("error");
-    }
-  }, []);
+        if (!publicClient) {
+          throw new Error("No 0G RPC client available to confirm the transaction.");
+        }
+
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash: hash as `0x${string}`,
+          confirmations: 1,
+        });
+        if (receipt.status === "reverted") {
+          throw new Error("Transaction reverted on-chain.");
+        }
+
+        // Set result and complete.
+        setResult(r);
+        setStatus("success");
+        return { status: "success" as const, txHash: hash, result: r };
+      } catch (e) {
+        const message = parseError(e);
+        setError(message);
+        setStatus("error");
+        return { status: "error" as const, txHash: broadcastHash, error: message };
+      }
+    },
+    [publicClient],
+  );
 
   return {
     status,

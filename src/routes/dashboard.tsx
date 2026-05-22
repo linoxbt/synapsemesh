@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { UnstakeAgentButton } from "@/components/UnstakeAgentButton";
 import { useWallet } from "@/lib/wallet";
 import { useLiveDAGs, useLiveAgents } from "@/lib/onchain";
 import { useBlockNumber } from "wagmi";
@@ -25,7 +26,7 @@ function Dashboard() {
 
   // Individual filtering
   const myDags = address ? dags.filter(d => d.owner.toLowerCase() === address.toLowerCase()) : [];
-  const myAgents = address ? agents.filter(a => a.owner.toLowerCase() === address.toLowerCase()) : [];
+  const myAgents = address ? agents.filter(a => a.owner.toLowerCase() === address.toLowerCase() && a.active) : [];
   
   // Calculate stats based on LiveDAG type
   const locked = myDags.filter(d => !d.complete).reduce((s, d) => s + Number(d.totalBudget), 0);
@@ -119,18 +120,21 @@ function Dashboard() {
             ) : (
               <ul className="divide-y divide-border/60">
                 {myAgents.map((a) => (
-                  <li key={a.id}>
-                    <Link to="/agents/$agentId" params={{ agentId: a.id }} className="py-4 flex items-center gap-4 hover:bg-secondary/30 -mx-2 px-2 rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-display text-lg truncate">{a.name}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">{a.op} · Stake: {Number(a.stake).toFixed(2)} OG</p>
-                      </div>
-                      <div className="text-right text-sm">
-                        <div className="w-10 h-10 rounded-full border border-border/60 grid place-items-center font-mono text-xs ml-auto">
-                          {a.reputation}
+                  <li key={a.id} className="py-4">
+                    <div className="flex items-center gap-4">
+                      <Link to="/agents/$agentId" params={{ agentId: a.id }} className="flex min-w-0 flex-1 items-center gap-4 rounded-lg px-2 py-2 -mx-2 hover:bg-secondary/30">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-display text-lg truncate">{a.name}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">{a.op} · Stake: {Number(a.stake).toFixed(2)} OG</p>
                         </div>
-                      </div>
-                    </Link>
+                        <div className="text-right text-sm">
+                          <div className="w-10 h-10 rounded-full border border-border/60 grid place-items-center font-mono text-xs ml-auto">
+                            {a.reputation}
+                          </div>
+                        </div>
+                      </Link>
+                      <UnstakeAgentButton agent={a} compact showStatus={false} />
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -158,4 +162,3 @@ function EmptyDags({ hasWallet, onConnect }: { hasWallet: boolean; onConnect: ()
     </div>
   );
 }
-

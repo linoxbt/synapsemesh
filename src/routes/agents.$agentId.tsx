@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { UnstakeAgentButton } from "@/components/UnstakeAgentButton";
 import { useLiveAgents, useAgentAttestations } from "@/lib/onchain";
 
 export const Route = createFileRoute("/agents/$agentId")({
@@ -42,6 +43,8 @@ function AgentDetail() {
   const { data: recent = [], isLoading: isLoadingAttest } = useAgentAttestations(agent?.id || "");
 
   if (!agent && !isLoadingAgents && agents.length > 0) throw notFound();
+  const registryStatus = !agent ? "..." : agent.active ? "Active" : "Offline";
+  const registryTone = !agent ? "text-muted-foreground" : agent.active ? "text-signal" : "text-destructive";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -70,11 +73,16 @@ function AgentDetail() {
             <h2 className="font-display text-xl">Onchain Status</h2>
             <dl className="grid grid-cols-2 gap-4 mt-6 text-sm">
               <div><dt className="text-muted-foreground text-xs">Jobs completed</dt><dd className="font-mono mt-1 text-lg">{agent?.jobs || 0}</dd></div>
-              <div><dt className="text-muted-foreground text-xs">Registry Status</dt><dd className="font-mono mt-1 text-signal text-lg">Active</dd></div>
+              <div><dt className="text-muted-foreground text-xs">Registry Status</dt><dd className={`font-mono mt-1 text-lg ${registryTone}`}>{registryStatus}</dd></div>
             </dl>
             <p className="text-xs text-muted-foreground mt-8 leading-relaxed">
               This agent is an ERC-7857 INFT. Its reputation and metadata are cryptographically tied to its wallet address.
             </p>
+            {agent && (
+              <div className="mt-6">
+                <UnstakeAgentButton agent={agent} />
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-2 card-soft p-6">
