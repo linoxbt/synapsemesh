@@ -11,6 +11,7 @@ import {
   type Abi,
 } from "viem";
 import { CONTRACT_ADDRESSES, AGENT_REGISTRY_ABI, TASK_DAG_REGISTRY_ABI } from "./contracts";
+import { SEEDED_AGENTS, SEEDED_DAGS, getSeededDAGDetails } from "./seedData";
 
 // ─── Indexing window ──────────────────────────────────────────────────────────
 // Querying eth_getLogs from block 0 on a public RPC against a 33M-block chain
@@ -70,6 +71,7 @@ export type LiveAgent = {
   capabilities: string[];
   endpoint: string;
   metadataURI: string;
+  avatarURI?: string;
   owner: string;
   reputation: number;
   stake: string;
@@ -150,9 +152,9 @@ export function useLiveAgents() {
   return useQuery({
     queryKey: ["liveAgents"],
     queryFn: async (): Promise<LiveAgent[]> => {
-      if (!publicClient) return [];
+      if (!publicClient) return SEEDED_AGENTS;
       const registryAddress = CONTRACT_ADDRESSES.agentRegistry as Address;
-      if (!deployed(registryAddress)) return [];
+      if (!deployed(registryAddress)) return SEEDED_AGENTS;
 
       const logs = await getLogsWindowed(publicClient, {
         address: registryAddress,
@@ -225,7 +227,7 @@ export function useLiveAgents() {
       });
 
       const addrs = Array.from(uniqueAddresses);
-      if (addrs.length === 0) return [];
+      if (addrs.length === 0) return SEEDED_AGENTS;
 
       const calls = addrs.map((address) => ({
         address: registryAddress,
@@ -278,7 +280,7 @@ export function useLiveAgents() {
           });
         }
       });
-      return agents.sort((a, b) => {
+      return mergeAgents(agents).sort((a, b) => {
         if (a.hasReadableProfile !== b.hasReadableProfile) return a.hasReadableProfile ? -1 : 1;
         return b.reputation - a.reputation;
       });
@@ -287,6 +289,11 @@ export function useLiveAgents() {
     refetchInterval: 30_000,
     staleTime: 20_000,
   });
+}
+
+function mergeAgents(agents: LiveAgent[]) {
+  const seen = new Set(agents.map((agent) => agent.id.toLowerCase()));
+  return [...SEEDED_AGENTS.filter((agent) => !seen.has(agent.id.toLowerCase())), ...agents];
 }
 
 // ─── DAGs ─────────────────────────────────────────────────────────────────────
@@ -318,9 +325,9 @@ export function useLiveDAGs() {
   return useQuery({
     queryKey: ["liveDAGs"],
     queryFn: async (): Promise<LiveDAG[]> => {
-      if (!publicClient) return [];
+      if (!publicClient) return SEEDED_DAGS;
       const dagRegAddress = CONTRACT_ADDRESSES.taskDagRegistry as Address;
-      if (!deployed(dagRegAddress)) return [];
+      if (!deployed(dagRegAddress)) return SEEDED_DAGS;
 
       const logs = await getLogsWindowed(publicClient, {
         address: dagRegAddress,
@@ -369,7 +376,7 @@ export function useLiveDAGs() {
       });
 
       const roots = Array.from(uniqueRoots);
-      if (roots.length === 0) return [];
+      if (roots.length === 0) return SEEDED_DAGS;
 
       const calls = roots.map((root) => ({
         address: dagRegAddress,
@@ -409,12 +416,17 @@ export function useLiveDAGs() {
           });
         }
       });
-      return dags.sort((a, b) => b.submittedAtBlock - a.submittedAtBlock);
+      return mergeDAGs(dags).sort((a, b) => b.submittedAtBlock - a.submittedAtBlock);
     },
     enabled: !!publicClient,
     refetchInterval: 30_000,
     staleTime: 20_000,
   });
+}
+
+function mergeDAGs(dags: LiveDAG[]) {
+  const seen = new Set(dags.map((dag) => dag.id.toLowerCase()));
+  return [...SEEDED_DAGS.filter((dag) => !seen.has(dag.id.toLowerCase())), ...dags];
 }
 
 // ─── DAG details ──────────────────────────────────────────────────────────────
@@ -447,6 +459,8 @@ export function useDAGDetails(dagRoot: string) {
   return useQuery({
     queryKey: ["dagDetails", dagRoot],
     queryFn: async () => {
+      const seeded = getSeededDAGDetails(dagRoot);
+      if (seeded) return seeded;
       if (!publicClient || !dagRoot) return { nodes: [], edges: [] };
 
       const dagRegAddress = CONTRACT_ADDRESSES.taskDagRegistry as Address;

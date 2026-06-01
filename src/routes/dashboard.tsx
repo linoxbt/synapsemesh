@@ -32,6 +32,8 @@ function Dashboard() {
   const locked = myDags.filter(d => !d.complete).reduce((s, d) => s + Number(d.totalBudget), 0);
   const released = myDags.filter(d => d.complete).reduce((s, d) => s + Number(d.totalBudget), 0);
   const executing = myDags.filter((d) => !d.complete).length;
+  const marketAgents = agents.filter((a) => a.active && a.hasReadableProfile);
+  const networkDags = dags.slice(0, 3);
 
   const stats = [
     { l: "My Locked OG", v: `${locked.toFixed(2)} OG` },
@@ -66,6 +68,73 @@ function Dashboard() {
                 <p className="font-display text-3xl mt-2">{s.v}</p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="container-edge py-8 grid lg:grid-cols-2 gap-6">
+          <div className="card-soft p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-2xl">Live Agent Market</h2>
+              <Link to="/agents" className="text-xs text-muted-foreground hover:text-accent">
+                Open market -&gt;
+              </Link>
+            </div>
+            <ul className="divide-y divide-border/60">
+              {marketAgents.slice(0, 3).map((agent) => (
+                <li key={agent.id} className="py-4">
+                  <Link
+                    to="/agents/$agentId"
+                    params={{ agentId: agent.id }}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 -mx-2 hover:bg-secondary/30"
+                  >
+                    {agent.avatarURI && (
+                      <img
+                        src={agent.avatarURI}
+                        alt=""
+                        className="h-11 w-11 rounded-xl border border-border/60 object-cover"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-lg truncate">{agent.name}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {agent.op} · rep {agent.reputation}
+                      </p>
+                    </div>
+                    <span className="font-mono text-xs">{Number(agent.stake).toFixed(2)} OG</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="card-soft p-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display text-2xl">Live Task DAGs</h2>
+              <Link to="/explorer" className="text-xs text-muted-foreground hover:text-accent">
+                Open explorer -&gt;
+              </Link>
+            </div>
+            <ul className="divide-y divide-border/60">
+              {networkDags.map((dag) => (
+                <li key={dag.id}>
+                  <Link
+                    to="/explorer/$dagId"
+                    params={{ dagId: dag.id }}
+                    className="py-4 flex items-center gap-4 hover:bg-secondary/30 -mx-2 px-2 rounded-lg"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-lg truncate">{dag.title}</p>
+                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {dag.nodeCount} nodes · {Number(dag.totalBudget).toFixed(2)} OG
+                      </p>
+                    </div>
+                    <span className={`inline-block text-[10px] uppercase tracking-widest border rounded-full px-2 py-0.5 ${dag.complete ? 'border-signal text-signal bg-signal/10' : 'border-accent text-accent bg-accent/10'}`}>
+                      {dag.complete ? 'Completed' : 'Active'}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 

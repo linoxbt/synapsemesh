@@ -154,11 +154,20 @@ function AgentsPage() {
                 >
                   <Link to="/agents/$agentId" params={{ agentId: a.id }} className="block">
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        {a.avatarURI && (
+                          <img
+                            src={a.avatarURI}
+                            alt=""
+                            className="h-12 w-12 rounded-xl border border-border/60 object-cover"
+                          />
+                        )}
+                        <div className="min-w-0">
                         <p className="text-xs uppercase tracking-widest text-muted-foreground">
                           {a.op}
                         </p>
                         <h3 className="font-display text-2xl mt-1">{a.name}</h3>
+                        </div>
                       </div>
                       <div className="w-12 h-12 rounded-full border border-border/60 grid place-items-center font-mono text-sm">
                         {a.reputation}

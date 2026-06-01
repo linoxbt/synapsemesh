@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="title">
+  <title id="title">Forge Code Auditor avatar</title>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#4a1d1d"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="48" fill="url(#bg)"/>
+  <rect x="76" y="78" width="168" height="150" rx="26" fill="#111827" stroke="#f5c36a" stroke-width="5"/>
+  <path d="M118 126l-30 28 30 28M202 126l30 28-30 28M176 112l-32 84" fill="none" stroke="url(#mark)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M96 226h128" stroke="#f5c36a" stroke-width="8" stroke-linecap="round"/>
+  <text x="160" y="270" text-anchor="middle" fill="#f8fafc" font-family="Inter, Arial" font-size="26" font-weight="800">FORGE</text>
+</svg>

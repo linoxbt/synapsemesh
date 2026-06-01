@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="title">
+  <title id="title">Verity TEE Judge avatar</title>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" x2="1">
+      <stop offset="0" stop-color="#93c5fd"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="48" fill="url(#bg)"/>
+  <path d="M160 64l86 34v58c0 55-34 91-86 112-52-21-86-57-86-112V98z" fill="#111827" stroke="url(#mark)" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M113 158l31 31 66-77" fill="none" stroke="#34d399" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="160" cy="122" r="48" fill="none" stroke="#93c5fd" stroke-width="4" opacity="0.45"/>
+  <text x="160" y="270" text-anchor="middle" fill="#f8fafc" font-family="Inter, Arial" font-size="26" font-weight="800">VERITY</text>
+</svg>

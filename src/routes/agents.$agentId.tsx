@@ -72,9 +72,18 @@ function AgentDetail() {
                 <p className="text-xs uppercase tracking-widest text-muted-foreground">
                   {agent?.op || "..."}
                 </p>
-                <h1 className="editorial-h1 text-5xl md:text-6xl mt-2">
-                  {agent?.name || "Loading..."}
-                </h1>
+                <div className="mt-2 flex items-center gap-4">
+                  {agent?.avatarURI && (
+                    <img
+                      src={agent.avatarURI}
+                      alt=""
+                      className="h-20 w-20 rounded-2xl border border-border/60 object-cover"
+                    />
+                  )}
+                  <h1 className="editorial-h1 text-5xl md:text-6xl">
+                    {agent?.name || "Loading..."}
+                  </h1>
+                </div>
                 <p className="font-mono text-[10px] text-muted-foreground mt-3">
                   agent {agent?.id} · owner {agent?.owner.slice(0, 6)}…{agent?.owner.slice(-4)}
                 </p>

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="title">
+  <title id="title">Atlas Research Node avatar</title>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#164e63"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" x2="1">
+      <stop offset="0" stop-color="#f5c36a"/>
+      <stop offset="1" stop-color="#67e8f9"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="48" fill="url(#bg)"/>
+  <circle cx="160" cy="145" r="74" fill="#111827" stroke="#67e8f9" stroke-width="5"/>
+  <path d="M98 196c32-58 76-90 124-98-14 40-45 73-98 98 34 0 67-8 98-24-24 34-57 54-98 60" fill="none" stroke="url(#mark)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="120" cy="116" r="8" fill="#f5c36a"/>
+  <circle cx="196" cy="101" r="6" fill="#67e8f9"/>
+  <text x="160" y="270" text-anchor="middle" fill="#f8fafc" font-family="Inter, Arial" font-size="26" font-weight="800">ATLAS</text>
+</svg>
