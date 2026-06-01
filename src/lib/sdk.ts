@@ -5,21 +5,34 @@
 
 import { useEffect, useState } from "react";
 
-export type AgentOp = "Researcher" | "Writer" | "Verifier" | "Vision" | "Aggregator" | "Coder" | "Custom";
+export type AgentOp =
+  | "Researcher"
+  | "Writer"
+  | "Verifier"
+  | "Vision"
+  | "Aggregator"
+  | "Coder"
+  | "Custom";
 export type NodeType = "SEQUENTIAL" | "PARALLEL" | "CONDITIONAL" | "REDUCE";
-export type NodeStatus = "Pending" | "Bidding" | "Executing" | "AwaitingVerify" | "Settled" | "Failed";
+export type NodeStatus =
+  | "Pending"
+  | "Bidding"
+  | "Executing"
+  | "AwaitingVerify"
+  | "Settled"
+  | "Failed";
 export type DagStatus = "Bidding" | "Executing" | "AwaitingVerify" | "Settled" | "Failed";
 
 export interface Agent {
-  id: string;          // INFT token id (synthetic)
+  id: string; // local registry id (synthetic)
   name: string;
   op: AgentOp;
   capabilities: string[];
-  stake: number;       // OG
-  reputation: number;  // 0-100
+  stake: number; // OG
+  reputation: number; // 0-100
   jobs: number;
-  earned: number;      // OG
-  owner: string;       // wallet address
+  earned: number; // OG
+  owner: string; // wallet address
   registeredAt: number;
 }
 
@@ -27,18 +40,18 @@ export interface TaskNode {
   id: string;
   label: string;
   type: NodeType;
-  budget: number;      // OG
+  budget: number; // OG
   deps: string[];
   agentId?: string;
   agentName?: string;
   status: NodeStatus;
-  score?: number;      // TEE score 0-100
-  payout?: number;     // OG released on settlement
+  score?: number; // TEE score 0-100
+  payout?: number; // OG released on settlement
   attestation?: Attestation;
 }
 
 export interface TaskDAG {
-  id: string;          // tx hash style
+  id: string; // tx hash style
   title: string;
   owner: string;
   nodes: TaskNode[];
@@ -84,11 +97,14 @@ interface State {
 const STORAGE_KEY = "synapsemesh.state.v1";
 
 function loadState(): State {
-  if (typeof window === "undefined") return { agents: [], dags: [], attestations: [], settlements: [], block: 12_847_221 };
+  if (typeof window === "undefined")
+    return { agents: [], dags: [], attestations: [], settlements: [], block: 12_847_221 };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    // Ignore corrupt local demo state.
+  }
   return { agents: [], dags: [], attestations: [], settlements: [], block: 12_847_221 };
 }
 
@@ -97,18 +113,26 @@ const listeners = new Set<() => void>();
 
 function persist() {
   if (typeof window === "undefined") return;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore localStorage quota/privacy failures.
+  }
   listeners.forEach((l) => l());
 }
 
-function rand(min: number, max: number) { return Math.random() * (max - min) + min; }
+function rand(min: number, max: number) {
+  return Math.random() * (max - min) + min;
+}
 function hex(len = 8) {
   const chars = "0123456789abcdef";
   let s = "0x";
   for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * 16)];
   return s;
 }
-function shortHash() { return `${hex(4)}…${hex(4).slice(2)}`; }
+function shortHash() {
+  return `${hex(4)}…${hex(4).slice(2)}`;
+}
 
 // Background block ticker
 if (typeof window !== "undefined") {
@@ -134,7 +158,13 @@ export const mesh = {
   agents: {
     list: () => state.agents,
     get: (id: string) => state.agents.find((a) => a.id === id || a.name === id),
-    register(input: { name: string; op: AgentOp; stake: number; capabilities: string[]; owner: string }) {
+    register(input: {
+      name: string;
+      op: AgentOp;
+      stake: number;
+      capabilities: string[];
+      owner: string;
+    }) {
       const agent: Agent = {
         id: hex(8),
         name: input.name,
@@ -156,7 +186,11 @@ export const mesh = {
   dags: {
     list: () => state.dags,
     get: (id: string) => state.dags.find((d) => d.id === id),
-    submit(input: { title: string; owner: string; nodes: Array<{ label: string; type: NodeType; budget: number; deps?: string[] }> }) {
+    submit(input: {
+      title: string;
+      owner: string;
+      nodes: Array<{ label: string; type: NodeType; budget: number; deps?: string[] }>;
+    }) {
       const ids = input.nodes.map(() => hex(3));
       const nodes: TaskNode[] = input.nodes.map((n, i) => ({
         id: ids[i],
@@ -206,71 +240,80 @@ function simulateExecution(dagId: string) {
     const agent = candidates[i % Math.max(candidates.length, 1)];
 
     // bid -> executing
-    setTimeout(() => {
-      const cur = state.dags.find((d) => d.id === dagId);
-      if (!cur) return;
-      const n = cur.nodes.find((x) => x.id === node.id)!;
-      n.agentId = agent?.id;
-      n.agentName = agent?.name || `agent-${node.id.slice(2)}`;
-      n.status = "Executing";
-      cur.status = "Executing";
-      persist();
-    }, 1500 + i * 800);
+    setTimeout(
+      () => {
+        const cur = state.dags.find((d) => d.id === dagId);
+        if (!cur) return;
+        const n = cur.nodes.find((x) => x.id === node.id)!;
+        n.agentId = agent?.id;
+        n.agentName = agent?.name || `agent-${node.id.slice(2)}`;
+        n.status = "Executing";
+        cur.status = "Executing";
+        persist();
+      },
+      1500 + i * 800,
+    );
 
     // executing -> awaiting verify -> settled
-    setTimeout(() => {
-      const cur = state.dags.find((d) => d.id === dagId);
-      if (!cur) return;
-      const n = cur.nodes.find((x) => x.id === node.id)!;
-      n.status = "AwaitingVerify";
-      persist();
-    }, 3500 + i * 1200);
+    setTimeout(
+      () => {
+        const cur = state.dags.find((d) => d.id === dagId);
+        if (!cur) return;
+        const n = cur.nodes.find((x) => x.id === node.id)!;
+        n.status = "AwaitingVerify";
+        persist();
+      },
+      3500 + i * 1200,
+    );
 
-    setTimeout(() => {
-      const cur = state.dags.find((d) => d.id === dagId);
-      if (!cur) return;
-      const n = cur.nodes.find((x) => x.id === node.id)!;
-      const score = Math.round(rand(85, 99));
-      const payout = +(n.budget * (score / 100)).toFixed(4);
-      const att: Attestation = {
-        id: hex(6),
-        dagId: cur.id,
-        nodeId: n.id,
-        agentName: n.agentName || "agent",
-        score,
-        payout,
-        teeImage: "0g-tee/judge:v1.4",
-        timestamp: Date.now(),
-      };
-      n.score = score;
-      n.payout = payout;
-      n.attestation = att;
-      n.status = "Settled";
-      cur.locked = +(cur.locked - n.budget).toFixed(4);
-      cur.released = +(cur.released + payout).toFixed(4);
-      state.attestations.unshift(att);
-      state.settlements.unshift({
-        id: hex(6),
-        dagId: cur.id,
-        nodeId: n.id,
-        nodeLabel: n.label,
-        agentName: n.agentName || "agent",
-        amount: payout,
-        kind: "release",
-        timestamp: Date.now(),
-      });
-      // bump agent stats
-      if (n.agentId) {
-        const ag = state.agents.find((a) => a.id === n.agentId);
-        if (ag) {
-          ag.jobs += 1;
-          ag.earned = +(ag.earned + payout).toFixed(4);
-          ag.reputation = Math.min(100, Math.round(ag.reputation * 0.9 + score * 0.1));
+    setTimeout(
+      () => {
+        const cur = state.dags.find((d) => d.id === dagId);
+        if (!cur) return;
+        const n = cur.nodes.find((x) => x.id === node.id)!;
+        const score = Math.round(rand(85, 99));
+        const payout = +(n.budget * (score / 100)).toFixed(4);
+        const att: Attestation = {
+          id: hex(6),
+          dagId: cur.id,
+          nodeId: n.id,
+          agentName: n.agentName || "agent",
+          score,
+          payout,
+          teeImage: "0g-tee/judge:v1.4",
+          timestamp: Date.now(),
+        };
+        n.score = score;
+        n.payout = payout;
+        n.attestation = att;
+        n.status = "Settled";
+        cur.locked = +(cur.locked - n.budget).toFixed(4);
+        cur.released = +(cur.released + payout).toFixed(4);
+        state.attestations.unshift(att);
+        state.settlements.unshift({
+          id: hex(6),
+          dagId: cur.id,
+          nodeId: n.id,
+          nodeLabel: n.label,
+          agentName: n.agentName || "agent",
+          amount: payout,
+          kind: "release",
+          timestamp: Date.now(),
+        });
+        // bump agent stats
+        if (n.agentId) {
+          const ag = state.agents.find((a) => a.id === n.agentId);
+          if (ag) {
+            ag.jobs += 1;
+            ag.earned = +(ag.earned + payout).toFixed(4);
+            ag.reputation = Math.min(100, Math.round(ag.reputation * 0.9 + score * 0.1));
+          }
         }
-      }
-      if (cur.nodes.every((x) => x.status === "Settled")) cur.status = "Settled";
-      persist();
-    }, 5500 + i * 1600);
+        if (cur.nodes.every((x) => x.status === "Settled")) cur.status = "Settled";
+        persist();
+      },
+      5500 + i * 1600,
+    );
   });
 }
 
@@ -281,7 +324,9 @@ export function useMesh<T>(selector: (s: State) => T): T {
     const update = () => setVal(selector(state));
     update();
     const unsub = mesh.subscribe(update);
-    return () => { unsub(); };
+    return () => {
+      unsub();
+    };
   }, [selector]);
   return val;
 }

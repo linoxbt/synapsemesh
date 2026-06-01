@@ -9,7 +9,8 @@ async function main() {
   const treasury = deployer.address;
   const zeroAddress = ethers.ZeroAddress;
   const zeroHash = ethers.ZeroHash;
-  const teeSignerAddress = process.env.VITE_TEE_VERIFIER_ADDRESS || "0x4870CbC4D07d6Ac2EE5aA865588e5985FE77a4E9";
+  const teeSignerAddress =
+    process.env.VITE_TEE_VERIFIER_ADDRESS || "0x4870CbC4D07d6Ac2EE5aA865588e5985FE77a4E9";
 
   const initialNonce = await ethers.provider.getTransactionCount(deployer.address);
   console.log("Starting nonce:", initialNonce);
@@ -22,11 +23,11 @@ async function main() {
   // N+4: BidEngine
   // Wait, TEEVerifierBridge depends on TaskDAGRegistry. BidEngine depends on TaskDAGRegistry.
   // We can deploy BidEngine at N+3 and TEEVerifierBridge at N+4!
-  
+
   // Predict BidEngine address: (it will be deployed at nonce N+3)
   const bidEngineAddress = ethers.getCreateAddress({
     from: deployer.address,
-    nonce: initialNonce + 3
+    nonce: initialNonce + 3,
   });
   console.log("Predicted BidEngine address:", bidEngineAddress);
 
@@ -46,7 +47,10 @@ async function main() {
 
   // Nonce N+2 (Takes BidEngine address and MeshEscrow address)
   const TaskDAGRegistry = await ethers.getContractFactory("TaskDAGRegistry");
-  const taskDagRegistry = await TaskDAGRegistry.deploy(bidEngineAddress, await meshEscrow.getAddress());
+  const taskDagRegistry = await TaskDAGRegistry.deploy(
+    bidEngineAddress,
+    await meshEscrow.getAddress(),
+  );
   await taskDagRegistry.waitForDeployment();
   console.log("TaskDAGRegistry deployed to:", await taskDagRegistry.getAddress());
 
@@ -55,14 +59,14 @@ async function main() {
   const bidEngine = await BidEngine.deploy(
     await agentRegistry.getAddress(),
     await taskDagRegistry.getAddress(),
-    teeSignerAddress
+    teeSignerAddress,
   );
   await bidEngine.waitForDeployment();
   console.log("BidEngine deployed to:", await bidEngine.getAddress());
-  
+
   if ((await bidEngine.getAddress()) !== bidEngineAddress) {
-      console.error("CRITICAL ERROR: Predicted BidEngine address didn't match actual!");
-      process.exit(1);
+    console.error("CRITICAL ERROR: Predicted BidEngine address didn't match actual!");
+    process.exit(1);
   }
 
   // Nonce N+4
@@ -72,7 +76,7 @@ async function main() {
     await agentRegistry.getAddress(),
     await taskDagRegistry.getAddress(),
     teeSignerAddress,
-    zeroHash // mrEnclave can be updated later
+    zeroHash, // mrEnclave can be updated later
   );
   await teeVerifier.waitForDeployment();
   console.log("TEEVerifierBridge deployed to:", await teeVerifier.getAddress());
@@ -89,17 +93,17 @@ async function main() {
     treasury,
     8000, // 80% to agent
     1000, // 10% to stakers
-    1000  // 10% to treasury
+    1000, // 10% to treasury
   );
   await revenueRouter.waitForDeployment();
   console.log("RevenueRouter deployed to:", await revenueRouter.getAddress());
-  
+
   await meshEscrow.setRevenueRouter(await revenueRouter.getAddress());
   await revenueRouter.setMeshEscrow(await meshEscrow.getAddress());
 
   console.log("\n--- Deploying System 2: Evolution Lab ---");
 
-  // Deploy FitnessOracle 
+  // Deploy FitnessOracle
   const FitnessOracle = await ethers.getContractFactory("FitnessOracle");
   const fitnessOracle = await FitnessOracle.deploy(teeSignerAddress, zeroHash);
   await fitnessOracle.waitForDeployment();
@@ -108,21 +112,22 @@ async function main() {
   // Expected remaining nonces:
   // N+0: GenOps
   // N+1: ModelGenome
-  // N+2: EvolutionClock
-  // Predict EvolutionClock at N+2
+  // N+2: FitnessOracle.setGenome()
+  // N+3: GenOps.setGenome()
+  // N+4: EvolutionClock
   const currentNonce = await ethers.provider.getTransactionCount(deployer.address);
   const evoClockAddress = ethers.getCreateAddress({
     from: deployer.address,
-    nonce: currentNonce + 2
+    nonce: currentNonce + 4,
   });
 
-  // Deploy GenOps 
+  // Deploy GenOps
   const GenOps = await ethers.getContractFactory("GenOps");
   const genOps = await GenOps.deploy(
     evoClockAddress,
     treasury,
     ethers.parseEther("1"), // 1 OG breeding fee
-    500 // 5% mutation rate
+    500, // 5% mutation rate
   );
   await genOps.waitForDeployment();
   console.log("GenOps deployed to:", await genOps.getAddress());
@@ -132,10 +137,10 @@ async function main() {
   const modelGenome = await ModelGenome.deploy(
     await fitnessOracle.getAddress(),
     await genOps.getAddress(),
-    treasury
+    treasury,
   );
   await modelGenome.waitForDeployment();
-  console.log("ModelGenome (ERC-7857) deployed to:", await modelGenome.getAddress());
+  console.log("ModelGenome (ERC-721) deployed to:", await modelGenome.getAddress());
 
   // Fix circular dependency
   await fitnessOracle.setGenome(await modelGenome.getAddress());
@@ -145,33 +150,47 @@ async function main() {
   const EvolutionClock = await ethers.getContractFactory("EvolutionClock");
   const evolutionClock = await EvolutionClock.deploy(
     await genOps.getAddress(),
-    100 // epoch length in blocks
+    100, // epoch length in blocks
   );
   await evolutionClock.waitForDeployment();
   console.log("EvolutionClock deployed to:", await evolutionClock.getAddress());
-  
+
   if ((await evolutionClock.getAddress()) !== evoClockAddress) {
-      console.error("CRITICAL ERROR: Predicted EvolutionClock address didn't match actual!");
-      process.exit(1);
+    console.error("CRITICAL ERROR: Predicted EvolutionClock address didn't match actual!");
+    process.exit(1);
   }
 
   // Deploy InferencePool
   const InferencePool = await ethers.getContractFactory("InferencePool");
-  const inferencePool = await InferencePool.deploy(await modelGenome.getAddress());
+  const inferencePool = await InferencePool.deploy(await modelGenome.getAddress(), treasury, 1000);
   await inferencePool.waitForDeployment();
   console.log("InferencePool deployed to:", await inferencePool.getAddress());
+  await modelGenome.setInferencePool(await inferencePool.getAddress());
 
   // Deploy GenomeMarket
   const GenomeMarket = await ethers.getContractFactory("GenomeMarket");
-  const genomeMarket = await GenomeMarket.deploy(await modelGenome.getAddress(), treasury);
+  const genomeMarket = await GenomeMarket.deploy(await modelGenome.getAddress(), treasury, 250);
   await genomeMarket.waitForDeployment();
   console.log("GenomeMarket deployed to:", await genomeMarket.getAddress());
 
   // Deploy GenomeDAO
   const GenomeDAO = await ethers.getContractFactory("GenomeDAO");
-  const genomeDAO = await GenomeDAO.deploy(await modelGenome.getAddress());
+  const genomeDAO = await GenomeDAO.deploy(
+    await modelGenome.getAddress(),
+    await evolutionClock.getAddress(),
+    await genOps.getAddress(),
+    await agentRegistry.getAddress(),
+    1000,
+    3,
+  );
   await genomeDAO.waitForDeployment();
   console.log("GenomeDAO deployed to:", await genomeDAO.getAddress());
+
+  await modelGenome.transferOwnership(await genomeDAO.getAddress());
+  await genOps.transferOwnership(await genomeDAO.getAddress());
+  await evolutionClock.transferOwnership(await genomeDAO.getAddress());
+  await agentRegistry.transferOwnership(await genomeDAO.getAddress());
+  console.log("Governance ownership transferred to GenomeDAO");
 
   console.log("\n--- Deployment Complete! ---");
 }

@@ -6,10 +6,12 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { TxStatusPanel } from "@/components/TxStatusPanel";
 import { useWallet } from "@/lib/wallet";
 import { useTxLifecycle } from "@/lib/tx";
-import { useWriteContract } from "wagmi";
-import { parseEther, keccak256, toHex } from "viem";
+import { usePublicClient, useWriteContract } from "wagmi";
+import { parseEther, stringToHex } from "viem";
 import { CONTRACT_ADDRESSES, AGENT_REGISTRY_ABI } from "@/lib/contracts";
+import { AGENT_BLUEPRINTS, type AgentBlueprint } from "@/lib/catalog";
 import type { AgentOp } from "@/lib/sdk";
+import type { LiveAgent } from "@/lib/onchain";
 
 export const Route = createFileRoute("/agents/register")({
   head: () => ({
@@ -18,12 +20,12 @@ export const Route = createFileRoute("/agents/register")({
       {
         name: "description",
         content:
-          "Register an autonomous agent on 0G Chain. Mint an ERC-7857 INFT, lock stake and declare capabilities via the SDK.",
+          "Register an autonomous agent on 0G Chain. Lock stake and declare its onchain identity.",
       },
       { property: "og:title", content: "Register Agent - SynapseMesh" },
       {
         property: "og:description",
-        content: "Stake, mint INFT and join the SynapseMesh registry.",
+        content: "Stake OG and join the SynapseMesh registry.",
       },
     ],
   }),
@@ -46,40 +48,78 @@ function RegisterAgentPage() {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [op, setOp] = useState<AgentOp>("Researcher");
-  const [stake, setStake] = useState(100);
+  const [stake, setStake] = useState(0.05);
   const [caps, setCaps] = useState("");
   const [endpoint, setEndpoint] = useState("");
+  const [metadataURI, setMetadataURI] = useState("");
 
   const capList = caps
     .split(",")
     .map((c) => c.trim())
     .filter(Boolean);
   const canSubmit =
-    !!address && isCorrectChain && name.trim().length > 0 && stake > 0 && capList.length > 0;
+    !!address &&
+    isCorrectChain &&
+    name.trim().length > 0 &&
+    name.trim().length <= 64 &&
+    stake > 0 &&
+    capList.length > 0 &&
+    capList.length <= 12 &&
+    capList.every((c) => c.length <= 40) &&
+    endpoint.length <= 160 &&
+    metadataURI.length <= 160;
 
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const tx = useTxLifecycle<string>(); // Returns txHash on success
+
+  const applyBlueprint = (agent: AgentBlueprint) => {
+    setName(agent.name);
+    setOp(agent.op);
+    setCaps(agent.capabilities.join(", "));
+    setEndpoint(agent.endpoint);
+    setMetadataURI(agent.metadataURI);
+  };
 
   const submit = async () => {
     if (!canSubmit) return;
     const outcome = await tx.run(async () => {
-      // Construct the real agent name: e.g. "Researcher-Alpha"
-      const fullName = `${op}-${name.trim()}`;
-      // Calculate bytes32 agentId (keccak256 of the name string)
-      const agentId = keccak256(toHex(fullName));
+      const profileName = name.trim();
+      const agentId = makeAgentId(op, profileName);
+      const supportsProfiles = await registrySupportsProfiles(publicClient, address);
 
       const txHash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.agentRegistry,
         abi: AGENT_REGISTRY_ABI,
-        functionName: "register",
-        args: [agentId],
+        functionName: supportsProfiles ? "registerWithProfile" : "register",
+        args: supportsProfiles
+          ? [agentId, profileName, op, capList, endpoint.trim(), metadataURI.trim()]
+          : [agentId],
         value: parseEther(stake.toString()),
       });
 
-      return { txHash, result: fullName };
+      return { txHash, result: address };
     });
 
     if (outcome.status === "success") {
+      queryClient.setQueryData<LiveAgent[]>(["liveAgents"], (current = []) => {
+        const created: LiveAgent = {
+          id: address!,
+          name: name.trim(),
+          op,
+          capabilities: capList,
+          endpoint: endpoint.trim(),
+          metadataURI: metadataURI.trim(),
+          owner: address!,
+          reputation: 500,
+          stake: String(stake),
+          jobs: 0,
+          earned: "0",
+          active: true,
+          hasReadableProfile: true,
+        };
+        return [created, ...current.filter((agent) => agent.id.toLowerCase() !== address!.toLowerCase())];
+      });
       await queryClient.invalidateQueries({ queryKey: ["liveAgents"] });
     }
   };
@@ -103,19 +143,43 @@ function RegisterAgentPage() {
               Register an <em className="italic text-accent">agent.</em>
             </h1>
             <p className="text-muted-foreground mt-5 max-w-xl text-sm">
-              Stakes OG into AgentRegistry.sol and mints an ERC-7857 INFT representing the agent's
-              identity, capabilities and reputation.
+              Stakes OG into AgentRegistry.sol and records the agent identity, capabilities and
+              reputation onchain.
             </p>
           </div>
         </section>
 
         <section className="container-edge py-10 grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 card-soft p-6 grid gap-5">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
+                Production profiles
+              </p>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {AGENT_BLUEPRINTS.slice(0, 4).map((agent) => (
+                  <button
+                    key={agent.name}
+                    type="button"
+                    onClick={() => applyBlueprint(agent)}
+                    className="text-left border border-border/60 rounded-lg p-3 hover:bg-secondary/40 transition-colors"
+                  >
+                    <span className="block font-display text-lg">{agent.name}</span>
+                    <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mt-1">
+                      {agent.op}
+                    </span>
+                    <span className="block text-xs text-muted-foreground mt-2 leading-relaxed">
+                      {agent.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <Field label="Agent name">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="claude-r1"
+                placeholder="Atlas Research Node"
                 className="w-full bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm"
               />
             </Field>
@@ -137,7 +201,8 @@ function RegisterAgentPage() {
               <Field label="Stake (OG)">
                 <input
                   type="number"
-                  min={1}
+                  min={0.05}
+                  step={0.01}
                   value={stake}
                   onChange={(e) => setStake(Number(e.target.value))}
                   className="w-full bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm font-mono"
@@ -174,6 +239,15 @@ function RegisterAgentPage() {
                 className="w-full bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm font-mono"
               />
             </Field>
+
+            <Field label="Metadata URI (optional)">
+              <input
+                value={metadataURI}
+                onChange={(e) => setMetadataURI(e.target.value)}
+                placeholder="0g://agents/atlas-research-node"
+                className="w-full bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm font-mono"
+              />
+            </Field>
           </div>
 
           <aside className="card-soft p-6 h-fit lg:sticky lg:top-24">
@@ -189,6 +263,7 @@ function RegisterAgentPage() {
               />
               <Row k="Stake locked" v={`${stake} OG`} />
               <Row k="Capabilities" v={String(capList.length)} />
+              <Row k="Profile" v="stored onchain when supported" />
             </dl>
             <div className="hairline my-5" />
             {!address ? (
@@ -215,18 +290,20 @@ function RegisterAgentPage() {
                   ? "Confirm in wallet..."
                   : tx.status === "confirming"
                     ? "Minting..."
-                    : `Stake ${stake} OG & mint INFT`}
+                    : `Stake ${stake} OG & register`}
               </button>
             )}
             <TxStatusPanel
               tx={tx}
               labels={{
-                confirming: "Locking stake & minting INFT",
+                confirming: "Locking stake & registering",
                 success: "Agent registered onchain",
               }}
             />
             <p className="text-[11px] text-muted-foreground mt-3">
-              Calls AgentRegistry.register() then mints an ERC-7857 INFT in a single tx.
+              Uses AgentRegistry.registerWithProfile() on latest deployments. Legacy registries
+              still receive a readable bytes32 Agent ID, so new entries no longer render as opaque
+              hash names.
             </p>
           </aside>
         </section>
@@ -234,6 +311,34 @@ function RegisterAgentPage() {
       <SiteFooter />
     </div>
   );
+}
+
+function makeAgentId(op: AgentOp, name: string): `0x${string}` {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 24);
+  const raw = `${op}:${slug || "agent"}`.slice(0, 31);
+  return stringToHex(raw, { size: 32 });
+}
+
+async function registrySupportsProfiles(
+  publicClient: ReturnType<typeof usePublicClient>,
+  owner: string | null,
+) {
+  if (!publicClient || !owner) return false;
+  try {
+    await publicClient.readContract({
+      address: CONTRACT_ADDRESSES.agentRegistry,
+      abi: AGENT_REGISTRY_ABI,
+      functionName: "getAgentProfile",
+      args: [owner as `0x${string}`],
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

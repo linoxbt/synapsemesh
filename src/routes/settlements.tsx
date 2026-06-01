@@ -9,7 +9,11 @@ export const Route = createFileRoute("/settlements")({
   head: () => ({
     meta: [
       { title: "Network Settlements - SynapseMesh" },
-      { name: "description", content: "Global network settlement tracker. Aggregated escrow releases, agent payouts, and live TEE verification feed on 0G Chain." },
+      {
+        name: "description",
+        content:
+          "Global network settlement tracker. Aggregated escrow releases, agent payouts, and live TEE verification feed on 0G Chain.",
+      },
       { property: "og:title", content: "Settlement Tracker - SynapseMesh" },
     ],
   }),
@@ -20,7 +24,7 @@ function Settlements() {
   const { data: dags = [] } = useLiveDAGs();
   const { data: settlements = [], isLoading } = useGlobalSettlements();
   const { data: blockNumber } = useBlockNumber({ watch: true });
-  
+
   const [q, setQ] = useState("");
 
   const filtered = useMemo(() => {
@@ -34,8 +38,10 @@ function Settlements() {
   }, [settlements, q]);
 
   const totalReleased = settlements.reduce((s, x) => s + Number(x.payout), 0);
-  const globalLocked = dags.filter(d => !d.complete).reduce((s, d) => s + Number(d.totalBudget), 0);
-  const activeDags = dags.filter(d => !d.complete).length;
+  const globalLocked = dags
+    .filter((d) => !d.complete)
+    .reduce((s, d) => s + Number(d.totalBudget), 0);
+  const activeDags = dags.filter((d) => !d.complete).length;
 
   const earnerMap = new Map<string, number>();
   filtered.forEach((s) => {
@@ -65,12 +71,16 @@ function Settlements() {
       <main className="flex-1">
         <section className="aurora">
           <div className="container-edge pt-20 pb-12">
-            <span className="chip"><span className="dot pulse-dot" /> Live Network · block {blockNumber?.toString() || "..."}</span>
+            <span className="chip">
+              <span className="dot pulse-dot" /> Live Network · block{" "}
+              {blockNumber?.toString() || "..."}
+            </span>
             <h1 className="editorial-h1 text-5xl md:text-7xl mt-6 max-w-3xl">
               Global <em className="italic text-accent">Settlements.</em>
             </h1>
             <p className="text-muted-foreground mt-6 max-w-xl">
-              The aggregate heartbeat of the SynapseMesh network. Track every escrow release, TEE attestation, and agent payout in real-time.
+              The aggregate heartbeat of the SynapseMesh network. Track every escrow release, TEE
+              attestation, and agent payout in real-time.
             </p>
           </div>
         </section>
@@ -87,46 +97,60 @@ function Settlements() {
         <section className="container-edge py-6 grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="card-soft p-6">
-               <div className="flex items-center justify-between mb-6">
-                 <h2 className="font-display text-2xl">Settlement Ledger</h2>
-               </div>
-               
-               <div className="overflow-x-auto">
-                 <table className="w-full text-sm text-left">
-                   <thead className="text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border/60">
-                     <tr>
-                       <th className="pb-3 font-medium">Agent</th>
-                       <th className="pb-3 font-medium">Task ID</th>
-                       <th className="pb-3 font-medium">Payout</th>
-                       <th className="pb-3 font-medium text-right">Block</th>
-                     </tr>
-                   </thead>
-                   <tbody className="divide-y divide-border/60">
-                     {filtered.length === 0 ? (
-                       <tr>
-                         <td colSpan={4} className="py-10 text-center text-muted-foreground">No settlements found onchain.</td>
-                       </tr>
-                     ) : filtered.slice(0, 20).map((s, i) => (
-                       <tr key={s.taskId + i} className="group hover:bg-secondary/20 transition-colors">
-                         <td className="py-4 font-mono text-xs truncate max-w-[120px]">
-                           <Link to="/agents/$agentId" params={{ agentId: (s as any).agent }} className="hover:text-accent">
-                             {(s as any).agent.slice(0,10)}...
-                           </Link>
-                         </td>
-                         <td className="py-4 font-mono text-xs truncate max-w-[120px]">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display text-2xl">Settlement Ledger</h2>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-[10px] uppercase tracking-widest text-muted-foreground border-b border-border/60">
+                    <tr>
+                      <th className="pb-3 font-medium">Agent</th>
+                      <th className="pb-3 font-medium">Task ID</th>
+                      <th className="pb-3 font-medium">Payout</th>
+                      <th className="pb-3 font-medium text-right">Block</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {filtered.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-10 text-center text-muted-foreground">
+                          No settlements found onchain.
+                        </td>
+                      </tr>
+                    ) : (
+                      filtered.slice(0, 20).map((s, i) => (
+                        <tr
+                          key={s.taskId + i}
+                          className="group hover:bg-secondary/20 transition-colors"
+                        >
+                          <td className="py-4 font-mono text-xs truncate max-w-[120px]">
+                            <Link
+                              to="/agents/$agentId"
+                              params={{ agentId: (s as any).agent }}
+                              className="hover:text-accent"
+                            >
+                              {(s as any).agent.slice(0, 10)}...
+                            </Link>
+                          </td>
+                          <td className="py-4 font-mono text-xs truncate max-w-[120px]">
                             {s.taskId.slice(0, 10)}...
-                         </td>
-                         <td className="py-4 font-mono text-signal">
-                            +{Number(s.payout).toFixed(3)} OG
-                         </td>
-                         <td className="py-4 text-right text-xs text-muted-foreground">
+                          </td>
+                          <td
+                            className={`py-4 font-mono ${(s as any).passed ? "text-signal" : "text-destructive"}`}
+                          >
+                            {(s as any).passed ? "+" : ""}
+                            {Number(s.payout).toFixed(3)} OG
+                          </td>
+                          <td className="py-4 text-right text-xs text-muted-foreground">
                             {s.blockNumber}
-                         </td>
-                       </tr>
-                     ))}
-                   </tbody>
-                 </table>
-               </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -139,7 +163,9 @@ function Settlements() {
                 </span>
               </div>
               {settlements.length === 0 ? (
-                <p className="mt-6 text-sm text-muted-foreground text-center py-10">Listening for attestations...</p>
+                <p className="mt-6 text-sm text-muted-foreground text-center py-10">
+                  Listening for attestations...
+                </p>
               ) : (
                 <ul className="mt-5 space-y-3">
                   {settlements.slice(0, 8).map((a, i) => (
@@ -149,11 +175,18 @@ function Settlements() {
                     >
                       <div className="min-w-0">
                         <span className="font-mono truncate block text-muted-foreground">
-                          Task {(a.taskId).slice(0, 8)}…
+                          Task {a.taskId.slice(0, 8)}…
                         </span>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">+{Number(a.payout).toFixed(4)} OG</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {(a as any).passed ? "passed" : "failed"} · {Number(a.payout).toFixed(4)}{" "}
+                          OG
+                        </p>
                       </div>
-                      <span className="font-display text-xl text-signal">{a.score}/100</span>
+                      <span
+                        className={`font-display text-xl ${(a as any).passed ? "text-signal" : "text-destructive"}`}
+                      >
+                        {a.score}/100
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -166,10 +199,16 @@ function Settlements() {
                 {earners.map(([name, v]) => (
                   <li key={name}>
                     <div className="flex justify-between text-[10px] font-mono mb-1.5 text-muted-foreground">
-                      <span>{name.slice(0,10)}...{name.slice(-4)}</span><span>{v.toFixed(2)} OG</span>
+                      <span>
+                        {name.slice(0, 10)}...{name.slice(-4)}
+                      </span>
+                      <span>{v.toFixed(2)} OG</span>
                     </div>
                     <div className="h-1 rounded-full bg-secondary overflow-hidden">
-                      <div className="h-full bg-accent" style={{ width: `${(v / earnerMax) * 100}%` }} />
+                      <div
+                        className="h-full bg-accent"
+                        style={{ width: `${(v / earnerMax) * 100}%` }}
+                      />
                     </div>
                   </li>
                 ))}

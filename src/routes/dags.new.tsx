@@ -1,16 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TxStatusPanel } from "@/components/TxStatusPanel";
 import { useWallet } from "@/lib/wallet";
 import { useTxLifecycle } from "@/lib/tx";
-import { useWriteContract } from 'wagmi';
+import { usePublicClient, useWriteContract } from 'wagmi';
 import { parseEther, keccak256, toHex } from 'viem';
 import { CONTRACT_ADDRESSES, TASK_DAG_REGISTRY_ABI } from "@/lib/contracts";
+import { TASK_TEMPLATES, type TaskTemplate } from "@/lib/catalog";
 import type { NodeType } from "@/lib/sdk";
+import { useLiveAgents, type LiveDAG } from "@/lib/onchain";
 
 export const Route = createFileRoute("/dags/new")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    agent: typeof search.agent === "string" ? search.agent : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Submit Task DAG - SynapseMesh" },
@@ -36,6 +42,7 @@ interface DraftNode {
   label: string;
   type: NodeType;
   budget: number;
+  deadlineBlocks: number;
   deps: string[];     // labels of upstream nodes
   // Schema fields — hashed client-side before submission.
   // These are real commitments: keccak256 of the text is stored onchain.
@@ -96,14 +103,19 @@ function topoSortNodes(ns: DraftNode[]): DraftNode[] {
 function NewDagPage() {
   const { address, connect, isCorrectChain, switchToZg } = useWallet();
   const navigate = useNavigate();
+  const { agent: agentFromSearch } = Route.useSearch();
+  const queryClient = useQueryClient();
+  const { data: agents = [] } = useLiveAgents();
   const [title, setTitle] = useState("");
   const [showSchemas, setShowSchemas] = useState(false);
+  const [selectedAgentId, setSelectedAgentId] = useState(agentFromSearch || "");
   const [nodes, setNodes] = useState<DraftNode[]>([
     {
       id: uid(),
       label: "Research",
       type: "SEQUENTIAL",
       budget: 1,
+      deadlineBlocks: 7200,
       deps: [],
       inputSchema: "",
       outputSchema: "",
@@ -111,8 +123,17 @@ function NewDagPage() {
     },
   ]);
 
+  useEffect(() => {
+    setSelectedAgentId(agentFromSearch || "");
+  }, [agentFromSearch]);
+
   const totalBudget = nodes.reduce((s, n) => s + (Number(n.budget) || 0), 0);
   const labels = nodes.map((n) => n.label).filter(Boolean);
+  const selectedAgent = agents.find((agent) => agent.id.toLowerCase() === selectedAgentId.toLowerCase());
+  const directHireAddress =
+    selectedAgent?.active && /^0x[a-fA-F0-9]{40}$/.test(selectedAgent.id)
+      ? (selectedAgent.id as `0x${string}`)
+      : ("0x0000000000000000000000000000000000000000" as `0x${string}`);
 
   // BFS over deps to detect whether targetLabel can reach sourceLabel —
   // used both for a UX guard ("disable dep chip that would close a cycle")
@@ -159,6 +180,7 @@ function NewDagPage() {
         inputSchema: "",
         outputSchema: "",
         qualityRubric: "",
+        deadlineBlocks: 7200,
       },
     ]);
 
@@ -167,16 +189,29 @@ function NewDagPage() {
     isCorrectChain &&
     title.trim().length > 0 &&
     nodes.length > 0 &&
-    nodes.every((n) => n.label.trim() && n.budget > 0) &&
+    nodes.every((n) => n.label.trim() && n.budget > 0 && n.deadlineBlocks > 0) &&
     new Set(labels).size === labels.length &&
     !cycleError;
 
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const tx = useTxLifecycle<string>();
+
+  const applyTemplate = (template: TaskTemplate) => {
+    setTitle(template.title);
+    setNodes(
+      template.nodes.map((node) => ({
+        ...node,
+        id: uid(),
+        deadlineBlocks: node.deadlineBlocks || 7200,
+      })),
+    );
+    setShowSchemas(true);
+  };
 
   const submit = async () => {
     if (!canSubmit) return;
-    await tx.run(async () => {
+    const outcome = await tx.run(async () => {
       // dagRoot is a unique identifier for this entire DAG.
       const dagRoot = keccak256(toHex(`${title.trim()}-${Date.now()}`));
 
@@ -203,27 +238,52 @@ function NewDagPage() {
         dependsOn:    n.deps.map((depLabel) => getTaskId(depLabel)),
         nodeType:     NODE_TYPE_MAP[n.type],
         maxBudget:    parseEther(n.budget.toString()),
-        timeoutBlocks: 100n,
-        assignedAgent: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+        timeoutBlocks: BigInt(Math.floor(n.deadlineBlocks)),
+        assignedAgent: directHireAddress,
         status:       0,    // NodeStatus.PENDING
         assignedAt:   0n,
         completedAt:  0n,
       }));
+      const taskMetadata = ordered.map((n) => ({
+        label: n.label.trim(),
+        inputSchemaURI: "",
+        outputSchemaURI: "",
+        qualityRubricURI: "",
+      }));
+      const supportsMetadata = await dagRegistrySupportsMetadata(publicClient);
 
       const txHash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.taskDagRegistry,
         abi: TASK_DAG_REGISTRY_ABI,
-        functionName: "submitDAG",
-        args: [dagRoot, taskNodes],
+        functionName: supportsMetadata ? "submitDAGWithMetadata" : "submitDAG",
+        args: supportsMetadata ? [dagRoot, taskNodes, title.trim(), "", taskMetadata] : [dagRoot, taskNodes],
         value: parseEther(totalBudget.toString()),
       });
 
       return { txHash, result: dagRoot };
     });
+
+    if (outcome.status === "success") {
+      queryClient.setQueryData<LiveDAG[]>(["liveDAGs"], (current = []) => {
+        const created: LiveDAG = {
+          id: outcome.result,
+          title: title.trim(),
+          metadataURI: "",
+          owner: address!,
+          totalBudget: String(totalBudget),
+          nodeCount: nodes.length,
+          submittedAtBlock: 0,
+          complete: false,
+          hasReadableMetadata: true,
+        };
+        return [created, ...current.filter((dag) => dag.id !== outcome.result)];
+      });
+      await queryClient.invalidateQueries({ queryKey: ["liveDAGs"] });
+    }
   };
 
   const goToDag = () => {
-    if (tx.result) navigate({ to: "/explorer" });
+    if (tx.result) navigate({ to: "/explorer/$dagId", params: { dagId: tx.result } });
   };
 
   return (
@@ -246,6 +306,30 @@ function NewDagPage() {
 
         <section className="container-edge py-10 grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 card-soft p-6">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
+                Task templates
+              </p>
+              <div className="grid md:grid-cols-2 gap-2">
+                {TASK_TEMPLATES.map((template) => (
+                  <button
+                    key={template.title}
+                    type="button"
+                    onClick={() => applyTemplate(template)}
+                    className="text-left border border-border/60 rounded-lg p-3 hover:bg-secondary/40 transition-colors"
+                  >
+                    <span className="block font-display text-lg">{template.title}</span>
+                    <span className="block text-xs text-muted-foreground mt-2 leading-relaxed">
+                      {template.description}
+                    </span>
+                    <span className="block text-[10px] uppercase tracking-widest text-muted-foreground mt-2">
+                      {template.nodes.length} nodes
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <label className="block text-xs uppercase tracking-widest text-muted-foreground">Title</label>
             <input
               value={title}
@@ -253,6 +337,31 @@ function NewDagPage() {
               placeholder="Quarterly research pipeline"
               className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm"
             />
+
+            <div className="mt-5">
+              <label className="block text-xs uppercase tracking-widest text-muted-foreground">
+                Hire agent
+              </label>
+              <select
+                value={selectedAgentId}
+                onChange={(e) => setSelectedAgentId(e.target.value)}
+                className="w-full mt-2 bg-secondary/40 border border-border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">Open bidding by registered agents</option>
+                {agents
+                  .filter((agent) => agent.active && agent.hasReadableProfile)
+                  .map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name} - {agent.op} - rep {agent.reputation}
+                    </option>
+                  ))}
+              </select>
+              {selectedAgent && (
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  This DAG will submit the selected agent address as the assigned agent for each node.
+                </p>
+              )}
+            </div>
 
             {/* Schema toggle */}
             <div className="flex items-center gap-3 mt-6">
@@ -293,7 +402,7 @@ function NewDagPage() {
                     </button>
                   </div>
 
-                  <div className="grid sm:grid-cols-3 gap-3">
+                  <div className="grid sm:grid-cols-4 gap-3">
                     <div>
                       <label className="block text-[10px] uppercase tracking-widest text-muted-foreground">Type</label>
                       <select
@@ -310,6 +419,15 @@ function NewDagPage() {
                         type="number" step="0.1" min="0"
                         value={n.budget}
                         onChange={(e) => update(n.id, { budget: Number(e.target.value) })}
+                        className="w-full mt-1 bg-secondary/40 border border-border rounded-lg px-2 py-1.5 text-sm font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-widest text-muted-foreground">Deadline blocks</label>
+                      <input
+                        type="number" step="100" min="1"
+                        value={n.deadlineBlocks}
+                        onChange={(e) => update(n.id, { deadlineBlocks: Number(e.target.value) })}
                         className="w-full mt-1 bg-secondary/40 border border-border rounded-lg px-2 py-1.5 text-sm font-mono"
                       />
                     </div>
@@ -404,6 +522,8 @@ function NewDagPage() {
             <dl className="mt-5 space-y-3 text-sm">
               <Row k="Nodes" v={String(nodes.length)} />
               <Row k="Total budget" v={`${totalBudget.toFixed(2)} OG`} />
+              <Row k="Hire mode" v={selectedAgent ? selectedAgent.name : "Open bidding"} />
+              <Row k="Shortest deadline" v={`${Math.min(...nodes.map((n) => n.deadlineBlocks))} blocks`} />
               <Row k="Owner" v={address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "Not connected"} />
               <Row k="Chain" v={isCorrectChain ? "0G Newton Mainnet" : "Wrong network — switch to 0G"} />
               <Row
@@ -436,7 +556,8 @@ function NewDagPage() {
             )}
             <TxStatusPanel tx={tx} labels={{ confirming: "Locking budget in MeshEscrow", success: "Task DAG submitted onchain" }} />
             <p className="text-[11px] text-muted-foreground mt-3">
-              Schema hashes are keccak256 commitments. Pin content to 0G Storage to make them resolvable by TEE judges.
+              Latest deployments emit the DAG title and node labels onchain. Schema bodies remain
+              keccak256 commitments and can be pinned to 0G Storage for TEE resolution.
             </p>
           </aside>
         </section>
@@ -444,6 +565,21 @@ function NewDagPage() {
       <SiteFooter />
     </div>
   );
+}
+
+async function dagRegistrySupportsMetadata(publicClient: ReturnType<typeof usePublicClient>) {
+  if (!publicClient) return false;
+  try {
+    await publicClient.readContract({
+      address: CONTRACT_ADDRESSES.taskDagRegistry,
+      abi: TASK_DAG_REGISTRY_ABI,
+      functionName: "dagMetadata",
+      args: ["0x0000000000000000000000000000000000000000000000000000000000000000"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function Row({ k, v }: { k: string; v: string }) {

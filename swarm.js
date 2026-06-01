@@ -100,10 +100,10 @@ function deriveTeeScore(taskId, agentAddress) {
 // ─── TEE Attestation signing ─────────────────────────────────────────────────
 // TEEVerifierBridge.submitVerification recovers the signer from teeSignature and
 // checks it equals trustedVerifierSigner. The agent must sign with TRUSTED_SIGNER_KEY.
-async function buildTeeSignature(trustedSigner, taskId, passed, score, mrEnclave) {
+async function buildTeeSignature(trustedSigner, chainId, verifierAddress, taskId, assignedAgent, passed, score, mrEnclave) {
   const msgHash = ethers.solidityPackedKeccak256(
-    ['bytes32', 'bool', 'uint8', 'bytes32'],
-    [taskId, passed, score, mrEnclave]
+    ['uint256', 'address', 'bytes32', 'address', 'bool', 'uint8', 'bytes32'],
+    [chainId, verifierAddress, taskId, assignedAgent, passed, score, mrEnclave]
   );
   return await trustedSigner.signMessage(ethers.getBytes(msgHash));
 }
@@ -147,7 +147,7 @@ async function startAgent(agentConfig, trustedSigner) {
     if (!isReg) {
       log('Not registered. Registering…');
       const agentIdBytes32 = ethers.id(agentConfig.name); // keccak256(utf8(name))
-      const tx = await agentReg.register(agentIdBytes32, { value: ethers.parseEther('0.01') });
+      const tx = await agentReg.register(agentIdBytes32, { value: ethers.parseEther('0.05') });
       await tx.wait();
       log('Registered ✓');
     } else {
@@ -164,6 +164,8 @@ async function startAgent(agentConfig, trustedSigner) {
     teeBridge.trustedMrEnclave(),
     teeBridge.MIN_QUALITY(),
   ]);
+  const verifierAddress = await teeBridge.getAddress();
+  const network = await provider.getNetwork();
   log(`TEE enclave: ${mrEnclave.slice(0, 10)}… | MIN_QUALITY: ${minQuality}`);
 
   // Tracks taskIds where this agent has an open bid (between submitBid and BidAwarded).
@@ -190,7 +192,16 @@ async function startAgent(agentConfig, trustedSigner) {
 
       log(`Work complete — score: ${score}/100 passed: ${passed}`);
 
-      const teeSignature = await buildTeeSignature(trustedSigner, taskId, passed, score, mrEnclave);
+      const teeSignature = await buildTeeSignature(
+        trustedSigner,
+        network.chainId,
+        verifierAddress,
+        taskId,
+        wallet.address,
+        passed,
+        score,
+        mrEnclave
+      );
 
       const verifyTx = await teeBridge.submitVerification(
         taskId,

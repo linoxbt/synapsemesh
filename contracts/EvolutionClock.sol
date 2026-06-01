@@ -48,6 +48,7 @@ contract EvolutionClock {
     event EpochLengthUpdated(uint256 newLength);
     event Paused(bool isPaused);
     event GenOpsUpdated(address newGenOps);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ─────────────────────────────────────────────────────────────
     //  Modifiers
@@ -90,6 +91,13 @@ contract EvolutionClock {
     function setPaused(bool _paused) external onlyOwner {
         paused = _paused;
         emit Paused(_paused);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "EvolutionClock: zero owner");
+        address previous = owner;
+        owner = newOwner;
+        emit OwnershipTransferred(previous, newOwner);
     }
 
     // ─────────────────────────────────────────────────────────────

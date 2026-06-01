@@ -1,4 +1,4 @@
-import { type Address, type PublicClient } from "viem";
+import { parseAbi, type Address } from "viem";
 
 /**
  * SYNAPSEMESH SMART CONTRACT REGISTRY (0G CHAIN)
@@ -47,12 +47,44 @@ export function isDeployed(key: keyof typeof CONTRACT_ADDRESSES): boolean {
   return CONTRACT_ADDRESSES[key] !== "0x";
 }
 
-import AgentRegistryJson from "./abis/AgentRegistry.json";
-import TaskDAGRegistryJson from "./abis/TaskDAGRegistry.json";
-import TEEVerifierBridgeJson from "./abis/TEEVerifierBridge.json";
+export const AGENT_REGISTRY_ABI = parseAbi([
+  "function register(bytes32 _agentId) payable",
+  "function registerWithProfile(bytes32 _agentId, string name, string operation, string[] capabilities, string endpoint, string metadataURI) payable",
+  "function updateProfile(string name, string operation, string[] capabilities, string endpoint, string metadataURI)",
+  "function deregister()",
+  "function getAgent(address _agent) view returns ((address owner, bytes32 agentId, uint256 stakedAmount, uint256 reputation, uint256 tasksCompleted, uint256 totalEarned, bool slashed, bool active))",
+  "function getAgentProfile(address _agent) view returns (string name, string operation, string[] capabilities, string endpoint, string metadataURI)",
+  "function getReputation(address _agent) view returns (uint256)",
+  "function isRegistered(address _agent) view returns (bool)",
+  "function MIN_STAKE() view returns (uint256)",
+  "event AgentRegistered(address indexed agent, bytes32 agentId, uint256 stake)",
+  "event AgentProfileUpdated(address indexed agent, bytes32 indexed agentId, string name, string operation, string[] capabilities, string endpoint, string metadataURI)",
+  "event AgentDeregistered(address indexed agent, uint256 stakeReturned)",
+  "event ReputationUpdated(address indexed agent, uint256 newScore)",
+]);
 
-export const AGENT_REGISTRY_ABI = AgentRegistryJson.abi;
-export const TASK_DAG_REGISTRY_ABI = TaskDAGRegistryJson.abi;
-export const TEE_VERIFIER_BRIDGE_ABI = TEEVerifierBridgeJson.abi;
+export const TASK_DAG_REGISTRY_ABI = parseAbi([
+  "function submitDAG(bytes32 dagRoot, (bytes32 taskId, bytes32 inputSchemaHash, bytes32 outputSchemaHash, bytes32 qualityRubricHash, bytes32[] dependsOn, uint8 nodeType, uint256 maxBudget, uint256 timeoutBlocks, address assignedAgent, uint8 status, uint256 assignedAt, uint256 completedAt)[] taskNodes) payable",
+  "function submitDAGWithMetadata(bytes32 dagRoot, (bytes32 taskId, bytes32 inputSchemaHash, bytes32 outputSchemaHash, bytes32 qualityRubricHash, bytes32[] dependsOn, uint8 nodeType, uint256 maxBudget, uint256 timeoutBlocks, address assignedAgent, uint8 status, uint256 assignedAt, uint256 completedAt)[] taskNodes, string title, string metadataURI, (string label, string inputSchemaURI, string outputSchemaURI, string qualityRubricURI)[] taskMetadata) payable",
+  "function getDAG(bytes32 dagRoot) view returns ((bytes32 dagRoot, address requester, uint256 totalBudget, uint256 submittedAt, uint256 nodeCount, bool complete))",
+  "function getNode(bytes32 taskId) view returns ((bytes32 taskId, bytes32 inputSchemaHash, bytes32 outputSchemaHash, bytes32 qualityRubricHash, bytes32[] dependsOn, uint8 nodeType, uint256 maxBudget, uint256 timeoutBlocks, address assignedAgent, uint8 status, uint256 assignedAt, uint256 completedAt))",
+  "function getDAGNodes(bytes32 dagRoot) view returns (bytes32[])",
+  "function dagMetadata(bytes32 dagRoot) view returns (string title, string metadataURI)",
+  "function nodeMetadata(bytes32 taskId) view returns (string label, string inputSchemaURI, string outputSchemaURI, string qualityRubricURI)",
+  "function getNodeStatus(bytes32 taskId) view returns (uint8)",
+  "function dependenciesMet(bytes32 taskId) view returns (bool)",
+  "function getAssignedAgent(bytes32 taskId) view returns (address)",
+  "event DAGSubmitted(bytes32 indexed dagRoot, address requester, uint256 nodeCount, uint256 budget)",
+  "event DAGMetadataSubmitted(bytes32 indexed dagRoot, string title, string metadataURI)",
+  "event NodeMetadataSubmitted(bytes32 indexed dagRoot, bytes32 indexed taskId, string label, string inputSchemaURI, string outputSchemaURI, string qualityRubricURI)",
+  "event NodeStatusChanged(bytes32 indexed taskId, uint8 newStatus, address agent)",
+]);
 
-// The rest of the functions can remain or be removed later, for now we just export the real ABIs.
+export const TEE_VERIFIER_BRIDGE_ABI = parseAbi([
+  "function submitVerification(bytes32 taskId, address assignedAgent, bool passed, uint8 score, bytes teeSignature)",
+  "function trustedMrEnclave() view returns (bytes32)",
+  "function trustedVerifierSigner() view returns (address)",
+  "function isProcessed(bytes32 taskId) view returns (bool)",
+  "function MIN_QUALITY() view returns (uint8)",
+  "event VerificationSubmitted(bytes32 indexed taskId, address indexed agent, bool passed, uint8 score, uint256 payout)",
+]);

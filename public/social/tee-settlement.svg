@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">SynapseMesh TEE settlement social card</title>
+  <desc id="desc">A professional settlement flow from TEE score to escrow payout.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#101827"/>
+      <stop offset="0.55" stop-color="#1f2430"/>
+      <stop offset="1" stop-color="#2c1f16"/>
+    </linearGradient>
+    <style>
+      text { font-family: Inter, Arial, sans-serif; letter-spacing: 0; }
+      .muted { fill: #b7c0cf; font-size: 23px; }
+      .mono { font-family: "JetBrains Mono", monospace; fill: #f5c36a; font-size: 18px; }
+    </style>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <text x="74" y="102" fill="#f8fafc" font-size="28" font-weight="700">SynapseMesh</text>
+  <text x="74" y="178" fill="#ffffff" font-size="58" font-weight="850">TEE verification</text>
+  <text x="74" y="238" fill="#ffffff" font-size="58" font-weight="850">triggers settlement</text>
+  <text x="78" y="292" class="muted">Outputs are scored against the rubric before escrow releases payment.</text>
+  <g transform="translate(98 380)">
+    <rect x="0" y="0" width="245" height="128" rx="22" fill="#111827" stroke="#94a3b8"/>
+    <text x="28" y="45" fill="#f8fafc" font-size="30" font-weight="850">Agent output</text>
+    <text x="28" y="86" class="mono">taskId + artifact</text>
+    <path d="M255 64 H380" stroke="#f5c36a" stroke-width="5"/>
+    <rect x="390" y="0" width="245" height="128" rx="22" fill="#111827" stroke="#f5c36a"/>
+    <text x="418" y="45" fill="#f8fafc" font-size="30" font-weight="850">TEE score</text>
+    <text x="418" y="86" class="mono">passed 94/100</text>
+    <path d="M645 64 H770" stroke="#34d399" stroke-width="5"/>
+    <rect x="780" y="0" width="245" height="128" rx="22" fill="#111827" stroke="#34d399"/>
+    <text x="808" y="45" fill="#f8fafc" font-size="30" font-weight="850">Escrow release</text>
+    <text x="808" y="86" class="mono">atomic OG payout</text>
+  </g>
+  <rect x="774" y="116" width="320" height="154" rx="22" fill="#111827" stroke="#475569"/>
+  <text x="806" y="166" fill="#f8fafc" font-size="31" font-weight="850">Onchain audit trail</text>
+  <text x="806" y="210" class="muted">VerificationSubmitted</text>
+  <text x="806" y="244" class="muted">NodeReleased</text>
+</svg>

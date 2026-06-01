@@ -108,11 +108,14 @@ contract MeshEscrow {
 
         uint256 total = 0;
         for (uint256 i = 0; i < taskIds.length; i++) {
+            require(taskIds[i] != bytes32(0), "MeshEscrow: zero taskId");
+            require(budgets[i] > 0, "MeshEscrow: zero budget");
+            require(nodeBudgets[taskIds[i]] == 0, "MeshEscrow: task already funded");
             nodeBudgets[taskIds[i]]  = budgets[i];
             taskRequester[taskIds[i]] = requester;
             total += budgets[i];
         }
-        require(msg.value >= total, "MeshEscrow: insufficient funds");
+        require(msg.value == total, "MeshEscrow: budget mismatch");
 
         emit FundsLocked(dagRoot, total);
     }
@@ -127,6 +130,7 @@ contract MeshEscrow {
 
         uint256 amount = nodeBudgets[taskId];
         require(amount > 0, "MeshEscrow: zero budget");
+        require(revenueRouter != address(0), "MeshEscrow: revenue router unset");
 
         // Send to RevenueRouter for splitting, forward agent address
         (bool ok, ) = revenueRouter.call{value: amount}(
@@ -149,7 +153,7 @@ contract MeshEscrow {
         require(amount > 0,            "MeshEscrow: zero budget");
         require(requester != address(0), "MeshEscrow: unknown requester");
 
-        payable(requester).transfer(amount);
+        _sendValue(requester, amount);
         emit NodeRefunded(taskId, requester, amount);
     }
 
@@ -163,6 +167,11 @@ contract MeshEscrow {
 
     function isReleased(bytes32 taskId) external view returns (bool) {
         return released[taskId];
+    }
+
+    function _sendValue(address to, uint256 amount) internal {
+        (bool ok, ) = payable(to).call{value: amount}("");
+        require(ok, "MeshEscrow: transfer failed");
     }
 
     receive() external payable {}

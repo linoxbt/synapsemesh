@@ -8,6 +8,7 @@ const links = [
   { to: "/explorer", label: "Explorer" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/dags/new", label: "Submit DAG" },
+  // Evolution Lab is intentionally disabled until the full page is production-ready.
   { to: "/settlements", label: "Settlements" },
   { to: "/docs", label: "Docs" },
 ] as const;
@@ -34,7 +35,9 @@ export function SiteHeader() {
                 key={l.to}
                 to={l.to}
                 className={`px-3 py-2 rounded-full text-sm transition-colors ${
-                  active ? "text-foreground bg-secondary/60" : "text-muted-foreground hover:text-foreground"
+                  active
+                    ? "text-foreground bg-secondary/60"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {l.label}
@@ -45,25 +48,18 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <ConnectButton.Custom>
-            {({
-              account,
-              chain,
-              openAccountModal,
-              openChainModal,
-              openConnectModal,
-              mounted,
-            }) => {
+            {({ account, chain, openAccountModal, openChainModal, openConnectModal, mounted }) => {
               const ready = mounted;
               const connected = ready && account && chain;
 
               return (
                 <div
                   {...(!ready && {
-                    'aria-hidden': true,
+                    "aria-hidden": true,
                     style: {
                       opacity: 0,
-                      pointerEvents: 'none',
-                      userSelect: 'none',
+                      pointerEvents: "none",
+                      userSelect: "none",
                     },
                   })}
                 >
@@ -106,12 +102,12 @@ export function SiteHeader() {
                                 width: 16,
                                 height: 16,
                                 borderRadius: 999,
-                                overflow: 'hidden',
+                                overflow: "hidden",
                               }}
                             >
                               {chain.iconUrl && (
                                 <img
-                                  alt={chain.name ?? 'Chain icon'}
+                                  alt={chain.name ?? "Chain icon"}
                                   src={chain.iconUrl}
                                   style={{ width: 16, height: 16 }}
                                 />

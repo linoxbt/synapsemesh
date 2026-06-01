@@ -11,6 +11,7 @@ function isRegistered(address agent) external view returns (bool);
 interface IDAGRegistry {
 function markNodeAssigned(bytes32 taskId, address agent) external;
 function markNodeFailed(bytes32 taskId) external;
+function getNodeStatus(bytes32 taskId) external view returns (uint8);
 }
 
 /**
@@ -121,6 +122,10 @@ contract BidEngine {
         IAgentRegistry reg = IAgentRegistry(agentRegistry);
         require(reg.isRegistered(msg.sender), "BidEngine: agent not registered");
         require(!awarded[taskId],             "BidEngine: already awarded");
+        require(IDAGRegistry(dagRegistry).getNodeStatus(taskId) == 1, "BidEngine: node not biddable");
+        require(price > 0,                    "BidEngine: zero price");
+        require(eta > 0,                      "BidEngine: zero eta");
+        require(!_hasBid(taskId, msg.sender), "BidEngine: duplicate bid");
 
         uint256 rep = reg.getReputation(msg.sender);
 
@@ -147,6 +152,7 @@ contract BidEngine {
      */
     function awardBid(bytes32 taskId, address winnerAgent) external onlyAuctioneer {
         require(!awarded[taskId], "BidEngine: already awarded");
+        require(IDAGRegistry(dagRegistry).getNodeStatus(taskId) == 1, "BidEngine: node not biddable");
         require(_hasBid(taskId, winnerAgent), "BidEngine: winner has no bid");
 
         awarded[taskId]  = true;
@@ -173,6 +179,8 @@ contract BidEngine {
      */
     function failNode(bytes32 taskId, string calldata reason) external onlyAuctioneer {
         require(!awarded[taskId], "BidEngine: already awarded");
+        require(IDAGRegistry(dagRegistry).getNodeStatus(taskId) == 1, "BidEngine: node not biddable");
+        awarded[taskId] = true;
         IDAGRegistry(dagRegistry).markNodeFailed(taskId);
         emit NodeFailed(taskId, reason);
     }

@@ -10,6 +10,7 @@ async function main() {
   const modelGenomeAddress = "0x50B7c1301CC7Da2EAd16375301e8977F0c1Ff793";
   const evoClockAddress = "0xB53F9cE714A679775470147DA1d1BdD3a7b47DDd";
   const genOpsAddress = "0x7cB119F6Dd19f1d882ab0F161BE95fC6Eeb38Ceb";
+  const agentRegistryAddress = process.env.VITE_CONTRACT_AGENT_REGISTRY || ethers.ZeroAddress;
 
   console.log("\n--- Deploying Final System 2 Extras ---");
 
@@ -19,6 +20,8 @@ async function main() {
   const inferencePool = await InferencePool.deploy(modelGenomeAddress, treasury, 1000);
   await inferencePool.waitForDeployment();
   console.log("InferencePool deployed to:", await inferencePool.getAddress());
+  const modelGenome = await ethers.getContractAt("ModelGenome", modelGenomeAddress);
+  await modelGenome.setInferencePool(await inferencePool.getAddress());
 
   // Deploy GenomeMarket
   // _genome, _treasury, _platformFeeBps (250 = 2.5%)
@@ -34,11 +37,23 @@ async function main() {
     modelGenomeAddress,
     evoClockAddress,
     genOpsAddress,
+    agentRegistryAddress,
     1000,
-    3
+    3,
   );
   await genomeDAO.waitForDeployment();
   console.log("GenomeDAO deployed to:", await genomeDAO.getAddress());
+
+  const genOps = await ethers.getContractAt("GenOps", genOpsAddress);
+  const evolutionClock = await ethers.getContractAt("EvolutionClock", evoClockAddress);
+  await modelGenome.transferOwnership(await genomeDAO.getAddress());
+  await genOps.transferOwnership(await genomeDAO.getAddress());
+  await evolutionClock.transferOwnership(await genomeDAO.getAddress());
+  if (agentRegistryAddress !== ethers.ZeroAddress) {
+    const agentRegistry = await ethers.getContractAt("AgentRegistry", agentRegistryAddress);
+    await agentRegistry.transferOwnership(await genomeDAO.getAddress());
+  }
+  console.log("Available ownership transferred to GenomeDAO");
 
   console.log("\n--- ALL DEPLOYMENTS COMPLETE! ---");
 }

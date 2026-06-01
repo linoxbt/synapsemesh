@@ -8,7 +8,11 @@ export const Route = createFileRoute("/agents/$agentId")({
   head: () => ({
     meta: [
       { title: "Agent - SynapseMesh" },
-      { name: "description", content: "Onchain profile for a SynapseMesh agent: reputation, stake, capabilities and recent attestations." },
+      {
+        name: "description",
+        content:
+          "Onchain profile for a SynapseMesh agent: reputation, stake, capabilities and recent attestations.",
+      },
     ],
   }),
   component: AgentDetail,
@@ -17,7 +21,9 @@ export const Route = createFileRoute("/agents/$agentId")({
       <SiteHeader />
       <div className="container-edge py-32 text-center">
         <p className="font-display text-3xl">Agent not found</p>
-        <Link to="/agents" className="btn-ghost mt-6 inline-flex">Back to registry</Link>
+        <Link to="/agents" className="btn-ghost mt-6 inline-flex">
+          Back to registry
+        </Link>
       </div>
       <SiteFooter />
     </div>
@@ -36,15 +42,21 @@ export const Route = createFileRoute("/agents/$agentId")({
 
 function AgentDetail() {
   const { agentId } = Route.useParams();
-  
+
   const { data: agents = [], isLoading: isLoadingAgents } = useLiveAgents();
-  const agent = agents.find((a) => a.id.toLowerCase() === agentId.toLowerCase() || a.name === agentId);
-  
+  const agent = agents.find(
+    (a) => a.id.toLowerCase() === agentId.toLowerCase() || a.name === agentId,
+  );
+
   const { data: recent = [], isLoading: isLoadingAttest } = useAgentAttestations(agent?.id || "");
 
   if (!agent && !isLoadingAgents && agents.length > 0) throw notFound();
   const registryStatus = !agent ? "..." : agent.active ? "Active" : "Offline";
-  const registryTone = !agent ? "text-muted-foreground" : agent.active ? "text-signal" : "text-destructive";
+  const registryTone = !agent
+    ? "text-muted-foreground"
+    : agent.active
+      ? "text-signal"
+      : "text-destructive";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -52,12 +64,20 @@ function AgentDetail() {
       <main className="flex-1">
         <section className="aurora">
           <div className="container-edge pt-16 pb-10">
-            <Link to="/agents" className="text-xs text-muted-foreground hover:text-accent">&larr; Registry</Link>
+            <Link to="/agents" className="text-xs text-muted-foreground hover:text-accent">
+              &larr; Registry
+            </Link>
             <div className="flex items-end justify-between flex-wrap gap-6 mt-4">
               <div>
-                <p className="text-xs uppercase tracking-widest text-muted-foreground">{agent?.op || "..."}</p>
-                <h1 className="editorial-h1 text-5xl md:text-6xl mt-2">{agent?.name || "Loading..."}</h1>
-                <p className="font-mono text-[10px] text-muted-foreground mt-3">INFT {agent?.id} · owner {agent?.owner.slice(0,6)}…{agent?.owner.slice(-4)}</p>
+                <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {agent?.op || "..."}
+                </p>
+                <h1 className="editorial-h1 text-5xl md:text-6xl mt-2">
+                  {agent?.name || "Loading..."}
+                </h1>
+                <p className="font-mono text-[10px] text-muted-foreground mt-3">
+                  agent {agent?.id} · owner {agent?.owner.slice(0, 6)}…{agent?.owner.slice(-4)}
+                </p>
               </div>
               <div className="grid grid-cols-3 gap-px bg-border rounded-2xl overflow-hidden text-center">
                 <Stat l="Reputation" v={String(agent?.reputation || 0)} />
@@ -72,38 +92,99 @@ function AgentDetail() {
           <div className="card-soft p-6 h-fit">
             <h2 className="font-display text-xl">Onchain Status</h2>
             <dl className="grid grid-cols-2 gap-4 mt-6 text-sm">
-              <div><dt className="text-muted-foreground text-xs">Jobs completed</dt><dd className="font-mono mt-1 text-lg">{agent?.jobs || 0}</dd></div>
-              <div><dt className="text-muted-foreground text-xs">Registry Status</dt><dd className={`font-mono mt-1 text-lg ${registryTone}`}>{registryStatus}</dd></div>
+              <div>
+                <dt className="text-muted-foreground text-xs">Jobs completed</dt>
+                <dd className="font-mono mt-1 text-lg">{agent?.jobs || 0}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground text-xs">Registry Status</dt>
+                <dd className={`font-mono mt-1 text-lg ${registryTone}`}>{registryStatus}</dd>
+              </div>
             </dl>
             <p className="text-xs text-muted-foreground mt-8 leading-relaxed">
-              This agent is an ERC-7857 INFT. Its reputation and metadata are cryptographically tied to its wallet address.
+              This agent is a stake-backed onchain registry entry. Its reputation and settlement
+              history are tied to its wallet address.
             </p>
             {agent && (
               <div className="mt-6">
+                <Link
+                  to="/dags/new"
+                  search={{ agent: agent.id }}
+                  className="btn-primary w-full justify-center"
+                >
+                  Hire in a DAG
+                </Link>
+              </div>
+            )}
+            {agent && (
+              <div className="mt-3">
                 <UnstakeAgentButton agent={agent} />
               </div>
             )}
           </div>
 
           <div className="lg:col-span-2 card-soft p-6">
-            <div className="flex justify-between items-end mb-4">
-               <h2 className="font-display text-xl">Recent TEE attestations</h2>
-               {isLoadingAttest && <div className="animate-spin w-4 h-4 border-2 border-accent border-t-transparent rounded-full" />}
+            <div className="mb-8">
+              <h2 className="font-display text-xl">Capabilities</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(agent?.capabilities || []).map((capability) => (
+                  <span
+                    key={capability}
+                    className="text-[10px] font-mono px-2 py-1 rounded-full border border-border/60 text-muted-foreground"
+                  >
+                    {capability}
+                  </span>
+                ))}
+              </div>
+              {(agent?.endpoint || agent?.metadataURI) && (
+                <dl className="mt-5 grid gap-2 text-xs">
+                  {agent.endpoint && (
+                    <div>
+                      <dt className="text-muted-foreground">Endpoint</dt>
+                      <dd className="font-mono break-all mt-1">{agent.endpoint}</dd>
+                    </div>
+                  )}
+                  {agent.metadataURI && (
+                    <div>
+                      <dt className="text-muted-foreground">Metadata</dt>
+                      <dd className="font-mono break-all mt-1">{agent.metadataURI}</dd>
+                    </div>
+                  )}
+                </dl>
+              )}
             </div>
-            
+            <div className="hairline mb-6" />
+            <div className="flex justify-between items-end mb-4">
+              <h2 className="font-display text-xl">Recent TEE attestations</h2>
+              {isLoadingAttest && (
+                <div className="animate-spin w-4 h-4 border-2 border-accent border-t-transparent rounded-full" />
+              )}
+            </div>
+
             {recent.length === 0 ? (
-              <p className="text-sm text-muted-foreground mt-6">No attestations yet. This agent has not been picked up by a Task DAG bid.</p>
+              <p className="text-sm text-muted-foreground mt-6">
+                No attestations yet. This agent has not been picked up by a Task DAG bid.
+              </p>
             ) : (
               <ul className="mt-4 divide-y divide-border/60">
                 {recent.map((a) => (
-                  <li key={a.taskId} className="py-3 flex items-center justify-between text-sm hover:bg-secondary/30 -mx-2 px-2 rounded-lg transition-colors">
+                  <li
+                    key={a.taskId}
+                    className="py-3 flex items-center justify-between text-sm hover:bg-secondary/30 -mx-2 px-2 rounded-lg transition-colors"
+                  >
                     <div className="min-w-0">
-                      <p className="font-mono text-xs text-muted-foreground truncate max-w-[200px] md:max-w-sm">Task {a.taskId}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest">Block {a.blockNumber}</p>
+                      <p className="font-mono text-xs text-muted-foreground truncate max-w-[200px] md:max-w-sm">
+                        Task {a.taskId}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest">
+                        Block {a.blockNumber}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-display text-xl text-signal">{a.score}/100</p>
-                      <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">+{Number(a.payout).toFixed(2)} OG</p>
+                      <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
+                        +{Number(a.payout).toFixed(2)} OG
+                      </p>
                     </div>
                   </li>
                 ))}

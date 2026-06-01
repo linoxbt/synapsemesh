@@ -53,6 +53,7 @@ contract InferencePool {
     uint256 public holderShare;   // 10000 - platformShare
 
     mapping(uint256 => bool)    public deployed;           // genomeId => in pool
+    mapping(uint256 => bool)    public knownPoolGenome;    // genomeId => ever added to array
     mapping(uint256 => uint256) public pendingRewards;     // genomeId => claimable OG
     mapping(uint256 => uint256) public totalEarned;        // genomeId => lifetime earnings
 
@@ -103,20 +104,24 @@ contract InferencePool {
 
     /**
      * @notice Add a deployed genome to the inference pool.
-     *         Only DEPLOYED-status genomes (fitness >= 88) can be added.
-     *         Called by owner/backend after ModelGenome emits GenomeDeployed.
+     *         Any wallet can add a DEPLOYED-status genome after ModelGenome
+     *         emits GenomeDeployed. This keeps pool enrollment permissionless;
+     *         the offchain compute operator can still decide which endpoints to serve.
      */
-    function addToPool(uint256 genomeId) external onlyOwner {
+    function addToPool(uint256 genomeId) external {
         require(!deployed[genomeId], "InferencePool: already in pool");
 
-        // Verify genome is DEPLOYED status (status = 2)
-        (, , , , , uint8 fitnessScore, , uint8 status, , , ) =
+        // Verify genome is DEPLOYED status (status = 2). The threshold lives in
+        // ModelGenome governance, so this contract should not hardcode it.
+        (, , , , , , , uint8 status, , , ) =
             IModelGenome(genome).getGenome(genomeId);
         require(status == 2,          "InferencePool: genome not DEPLOYED");
-        require(fitnessScore >= 88,   "InferencePool: fitness too low");
 
         deployed[genomeId] = true;
-        deployedGenomes.push(genomeId);
+        if (!knownPoolGenome[genomeId]) {
+            knownPoolGenome[genomeId] = true;
+            deployedGenomes.push(genomeId);
+        }
 
         emit GenomeDeployedToPool(genomeId);
     }
@@ -147,7 +152,7 @@ contract InferencePool {
         pendingRewards[genomeId] += holderAmt;
         totalEarned[genomeId]    += msg.value;
 
-        payable(treasury).transfer(platformAmt);
+        _sendValue(treasury, platformAmt);
 
         // Record on genome NFT
         IModelGenome(genome).accrueRevenue(genomeId, msg.value);
@@ -168,7 +173,7 @@ contract InferencePool {
         require(reward > 0, "InferencePool: nothing to claim");
 
         pendingRewards[genomeId] = 0;
-        payable(holder).transfer(reward);
+        _sendValue(holder, reward);
 
         emit RewardClaimed(genomeId, holder, reward);
     }
@@ -187,6 +192,12 @@ contract InferencePool {
 
     function isDeployed(uint256 genomeId) external view returns (bool) {
         return deployed[genomeId];
+    }
+
+    function _sendValue(address to, uint256 amount) internal {
+        if (amount == 0) return;
+        (bool ok, ) = payable(to).call{value: amount}("");
+        require(ok, "InferencePool: transfer failed");
     }
 
     receive() external payable {}

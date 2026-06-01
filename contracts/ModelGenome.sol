@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title ModelGenome
- * @notice ERC-7857 Intelligent NFT. Every AI model in the Evolution Lab
+ * @notice ERC-721 genome NFT. Every AI model in the Evolution Lab
  *         is represented as a genome NFT with encrypted adapter weights
  *         stored on 0G Storage. Fitness scoring drives extinction or deployment.
  *
@@ -58,6 +58,7 @@ contract ModelGenome is ERC721, Ownable {
 
     address public fitnessOracle;
     address public genOps;
+    address public inferencePool;
     address public treasury;
 
     uint8 public EXTINCTION_THRESHOLD  = 45;  // below this → EXTINCT
@@ -73,6 +74,9 @@ contract ModelGenome is ERC721, Ownable {
     event GenomeDeployed(uint256 indexed id);
     event Crossover(uint256 parentA, uint256 parentB, uint256 childId, uint256 alpha);
     event RevenueAccrued(uint256 indexed id, uint256 amount);
+    event AdapterRootUpdated(uint256 indexed id, bytes32 adapterStorageRoot);
+    event OraclesUpdated(address fitnessOracle, address genOps);
+    event InferencePoolSet(address inferencePool);
     event ThresholdsUpdated(uint8 extinction, uint8 deployment);
     event MintFeeUpdated(uint256 newFee);
 
@@ -80,11 +84,18 @@ contract ModelGenome is ERC721, Ownable {
     //  Modifiers
     // ─────────────────────────────────────────────────────────────
 
-    modifier onlyOracle() {
-        require(
-            msg.sender == fitnessOracle || msg.sender == genOps,
-            "ModelGenome: unauthorized"
-        );
+    modifier onlyFitnessOracle() {
+        require(msg.sender == fitnessOracle, "ModelGenome: only fitness oracle");
+        _;
+    }
+
+    modifier onlyGenOps() {
+        require(msg.sender == genOps, "ModelGenome: only genOps");
+        _;
+    }
+
+    modifier onlyInferencePool() {
+        require(msg.sender == inferencePool, "ModelGenome: only inference pool");
         _;
     }
 
@@ -117,14 +128,24 @@ contract ModelGenome is ERC721, Ownable {
 
     function setThresholds(uint8 _extinction, uint8 _deployment) external onlyOwner {
         require(_extinction < _deployment, "ModelGenome: invalid thresholds");
+        require(_deployment <= 100, "ModelGenome: threshold > 100");
         EXTINCTION_THRESHOLD = _extinction;
         DEPLOYMENT_THRESHOLD = _deployment;
         emit ThresholdsUpdated(_extinction, _deployment);
     }
 
     function setOracles(address _fitnessOracle, address _genOps) external onlyOwner {
+        require(_fitnessOracle != address(0), "zero oracle");
+        require(_genOps != address(0), "zero genOps");
         fitnessOracle = _fitnessOracle;
         genOps        = _genOps;
+        emit OraclesUpdated(_fitnessOracle, _genOps);
+    }
+
+    function setInferencePool(address _inferencePool) external onlyOwner {
+        require(_inferencePool != address(0), "zero inferencePool");
+        inferencePool = _inferencePool;
+        emit InferencePoolSet(_inferencePool);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -168,8 +189,7 @@ contract ModelGenome is ERC721, Ownable {
         speciesPopulation[speciesId].push(id);
         _mint(msg.sender, id);
 
-        // Mint fee to treasury
-        payable(treasury).transfer(msg.value);
+        _sendValue(treasury, msg.value);
 
         emit GenomeMinted(id, msg.sender, speciesId, 0);
         return id;
@@ -190,9 +210,10 @@ contract ModelGenome is ERC721, Ownable {
         bytes32 childAdapterRoot,
         bytes32 childLineageRoot,
         uint256 alpha
-    ) external onlyOracle returns (uint256) {
+    ) external onlyGenOps returns (uint256) {
         require(_ownerOf(parentA) != address(0), "ModelGenome: parentA not exist");
         require(_ownerOf(parentB) != address(0), "ModelGenome: parentB not exist");
+        require(childAdapterRoot != bytes32(0), "ModelGenome: zero adapter root");
 
         Genome storage pA = genomes[parentA];
 
@@ -232,10 +253,11 @@ contract ModelGenome is ERC721, Ownable {
      * @param genomeId  Token ID
      * @param score     0–100 fitness score from TEE
      */
-    function submitFitness(uint256 genomeId, uint8 score) external onlyOracle {
+    function submitFitness(uint256 genomeId, uint8 score) external onlyFitnessOracle {
         Genome storage g = genomes[genomeId];
-        require(g.status == GenomeStatus.ACTIVE, "ModelGenome: not active");
         require(_ownerOf(genomeId) != address(0), "ModelGenome: genome not exist");
+        require(g.status == GenomeStatus.ACTIVE, "ModelGenome: not active");
+        require(score <= 100, "ModelGenome: score > 100");
 
         g.fitnessScore = score;
         emit FitnessUpdated(genomeId, score, block.number);
@@ -250,9 +272,19 @@ contract ModelGenome is ERC721, Ownable {
     }
 
     /// @notice Called by InferencePool to record earnings
-    function accrueRevenue(uint256 genomeId, uint256 amount) external {
+    function accrueRevenue(uint256 genomeId, uint256 amount) external onlyInferencePool {
+        require(_ownerOf(genomeId) != address(0), "ModelGenome: genome not exist");
         genomes[genomeId].inferenceRevenue += amount;
         emit RevenueAccrued(genomeId, amount);
+    }
+
+    /// @notice Called by GenOps after a genome owner commits a mutation result.
+    function updateAdapterRoot(uint256 genomeId, bytes32 newAdapterRoot) external onlyGenOps {
+        require(_ownerOf(genomeId) != address(0), "ModelGenome: genome not exist");
+        require(genomes[genomeId].status == GenomeStatus.ACTIVE, "ModelGenome: not active");
+        require(newAdapterRoot != bytes32(0), "ModelGenome: zero adapter root");
+        genomes[genomeId].adapterStorageRoot = newAdapterRoot;
+        emit AdapterRootUpdated(genomeId, newAdapterRoot);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -272,6 +304,12 @@ contract ModelGenome is ERC721, Ownable {
     }
 
     function isActive(uint256 genomeId) external view returns (bool) {
-        return genomes[genomeId].status == GenomeStatus.ACTIVE;
+        return _ownerOf(genomeId) != address(0) && genomes[genomeId].status == GenomeStatus.ACTIVE;
+    }
+
+    function _sendValue(address to, uint256 amount) internal {
+        if (amount == 0) return;
+        (bool ok, ) = payable(to).call{value: amount}("");
+        require(ok, "ModelGenome: transfer failed");
     }
 }

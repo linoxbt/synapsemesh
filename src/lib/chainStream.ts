@@ -1,5 +1,5 @@
 // Real onchain TEE attestation streamer.
-// Polls eth_getLogs against the configured 0G Chain RPC for AttestationPosted
+// Polls eth_getLogs against the configured 0G Chain RPC for VerificationSubmitted
 // events emitted by the TEE Verifier contract. Includes:
 //   - Last-seen block cursor (persisted to localStorage), clamped on hydration
 //     so a stale cursor never triggers a 33M-block backfill
@@ -13,7 +13,7 @@
 //   VITE_ZG_RPC_URL                (default: https://evmrpc.0g.ai)
 //   VITE_ZG_EXPLORER               (default: https://chainscan.0g.ai)
 //   VITE_TEE_VERIFIER_ADDRESS      (required for live stream)
-//   VITE_TEE_ATTEST_TOPIC          (defaults to keccak256("AttestationPosted(bytes32,bytes32,address,uint256,uint256)"))
+//   VITE_TEE_ATTEST_TOPIC          (defaults to keccak256("VerificationSubmitted(bytes32,address,bool,uint8,uint256)"))
 //   VITE_INDEX_FROM_BLOCK          (optional lower bound — usually the contract deploy block)
 //   VITE_INDEX_LOOKBACK_BLOCKS     (default 10000 — caps how far back to scan)
 //   VITE_INDEX_CHUNK_BLOCKS        (default 5000  — target chunk size per eth_getLogs)
@@ -21,20 +21,19 @@
 import { useEffect, useRef, useState } from "react";
 
 export interface ChainAttestation {
-  id: string;          // dedupe key: txHash:logIndex
+  id: string; // dedupe key: txHash:logIndex
   txHash: string;
   logIndex: number;
   blockNumber: number;
   dagId: string;
   nodeId: string;
-  agent: string;       // address (hex)
-  score: number;       // 0-100
-  payout: number;      // OG
-  timestamp: number;   // ms
+  agent: string; // address (hex)
+  score: number; // 0-100
+  payout: number; // OG
+  timestamp: number; // ms
 }
 
-const ENV =
-  (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
+const ENV = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
 
 const readPositiveInt = (key: string, fallback: number): number => {
   const raw = ENV[key];
@@ -47,9 +46,9 @@ export const ZG_RPC = ENV.VITE_ZG_RPC_URL || "https://evmrpc.0g.ai";
 export const ZG_EXPLORER = ENV.VITE_ZG_EXPLORER || "https://chainscan.0g.ai";
 export const TEE_VERIFIER = ENV.VITE_TEE_VERIFIER_ADDRESS || "";
 export const TEE_TOPIC =
-  ENV.VITE_TEE_ATTEST_TOPIC
-  // keccak256("AttestationPosted(bytes32,bytes32,address,uint256,uint256)")
-  || "0xeb26a43a6c659dd466d7b33eb02355968ec2f414bf1419f72bcd5674773329c8";
+  ENV.VITE_TEE_ATTEST_TOPIC ||
+  // keccak256("VerificationSubmitted(bytes32,address,bool,uint8,uint256)")
+  "0x48b275374edd791a67225bcff55495fa73f9bfaf4e3a03572e3ae432b6909152";
 
 // Bounds for the historical scan. INDEX_FROM_BLOCK is an absolute floor (e.g.
 // the contract deploy block); LOOKBACK is a sliding window relative to head.
@@ -69,7 +68,10 @@ const CURSOR_KEY = "synapsemesh.tee.cursor";
 const SEEN_KEY = "synapsemesh.tee.seen";
 const MAX_SEEN = 500;
 
-interface RpcResp<T> { result?: T; error?: { message: string } }
+interface RpcResp<T> {
+  result?: T;
+  error?: { message: string };
+}
 
 async function rpc<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(ZG_RPC, {
@@ -88,23 +90,26 @@ const toNum = (h: string) => parseInt(h, 16);
 const toBig = (h: string) => BigInt(h);
 
 function decodeLog(log: {
-  transactionHash: string; logIndex: string; blockNumber: string; topics: string[]; data: string;
+  transactionHash: string;
+  logIndex: string;
+  blockNumber: string;
+  topics: string[];
+  data: string;
 }): ChainAttestation {
-  // topics: [event, dagId, nodeId, agent]; data: score, payout (uint256, uint256)
-  const dagId = log.topics[1] ?? "0x";
-  const nodeId = log.topics[2] ?? "0x";
-  const agent = log.topics[3] ? "0x" + log.topics[3].slice(-40) : "0x";
+  // topics: [event, taskId, agent]; data: passed, score, payout
+  const taskId = log.topics[1] ?? "0x";
+  const agent = log.topics[2] ? "0x" + log.topics[2].slice(-40) : "0x";
   const data = log.data.replace(/^0x/, "");
-  const score = data.length >= 64 ? Number(toBig("0x" + data.slice(0, 64))) : 0;
-  const payoutWei = data.length >= 128 ? toBig("0x" + data.slice(64, 128)) : 0n;
+  const score = data.length >= 128 ? Number(toBig("0x" + data.slice(64, 128))) : 0;
+  const payoutWei = data.length >= 192 ? toBig("0x" + data.slice(128, 192)) : 0n;
   const payout = Number(payoutWei) / 1e18;
   return {
     id: `${log.transactionHash}:${toNum(log.logIndex)}`,
     txHash: log.transactionHash,
     logIndex: toNum(log.logIndex),
     blockNumber: toNum(log.blockNumber),
-    dagId,
-    nodeId,
+    dagId: taskId,
+    nodeId: taskId,
     agent,
     score: Math.min(100, score),
     payout,
@@ -141,7 +146,9 @@ export function useChainAttestations(limit = 50): StreamState {
     try {
       const seen = JSON.parse(localStorage.getItem(SEEN_KEY) || "[]") as string[];
       seenRef.current = new Set(seen);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     let cursor: number | null = null;
     try {
       const c = localStorage.getItem(CURSOR_KEY);
@@ -149,7 +156,9 @@ export function useChainAttestations(limit = 50): StreamState {
         const parsed = Number(c);
         if (Number.isFinite(parsed) && parsed >= 0) cursor = parsed;
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     let chunkSize = INDEX_CHUNK_BLOCKS;
     let errorBackoff = 1_000;
@@ -206,12 +215,14 @@ export function useChainAttestations(limit = 50): StreamState {
           data: string;
         }>;
         try {
-          logs = await rpc<typeof logs>("eth_getLogs", [{
-            fromBlock: "0x" + fromBlock.toString(16),
-            toBlock: "0x" + toBlock.toString(16),
-            address: TEE_VERIFIER,
-            topics: [TEE_TOPIC],
-          }]);
+          logs = await rpc<typeof logs>("eth_getLogs", [
+            {
+              fromBlock: "0x" + fromBlock.toString(16),
+              toBlock: "0x" + toBlock.toString(16),
+              address: TEE_VERIFIER,
+              topics: [TEE_TOPIC],
+            },
+          ]);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (RANGE_ERROR_RE.test(msg) && chunkSize > MIN_CHUNK_BLOCKS) {
@@ -246,7 +257,9 @@ export function useChainAttestations(limit = 50): StreamState {
               JSON.stringify(Array.from(seenRef.current).slice(-MAX_SEEN)),
             );
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
 
         if (fresh.length) {
           setState((s) => ({

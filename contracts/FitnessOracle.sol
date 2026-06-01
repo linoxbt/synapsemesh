@@ -43,6 +43,8 @@ contract FitnessOracle {
     mapping(uint256 => uint8)   public lastFitnessScore; // genomeId => last score
 
     uint256 public MIN_EVAL_INTERVAL = 100; // blocks between evaluations
+    uint256 private constant SECP256K1N_HALF =
+        0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0;
 
     // ─────────────────────────────────────────────────────────────
     //  Events
@@ -54,6 +56,7 @@ contract FitnessOracle {
     event SignerUpdated(address newSigner);
     event EnclaveUpdated(bytes32 newEnclave);
     event EvalIntervalUpdated(uint256 newInterval);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ─────────────────────────────────────────────────────────────
     //  Modifiers
@@ -104,6 +107,13 @@ contract FitnessOracle {
         emit EvalIntervalUpdated(_interval);
     }
 
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "FitnessOracle: zero owner");
+        address previous = owner;
+        owner = newOwner;
+        emit OwnershipTransferred(previous, newOwner);
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  Evaluation flow
     // ─────────────────────────────────────────────────────────────
@@ -119,7 +129,8 @@ contract FitnessOracle {
         require(genome != address(0),               "FitnessOracle: genome not set");
         require(IModelGenome(genome).isActive(genomeId), "FitnessOracle: genome not active");
         require(
-            block.number >= lastEvalBlock[genomeId] + MIN_EVAL_INTERVAL,
+            lastEvalBlock[genomeId] == 0 ||
+                block.number >= lastEvalBlock[genomeId] + MIN_EVAL_INTERVAL,
             "FitnessOracle: too soon since last eval"
         );
 
@@ -135,7 +146,7 @@ contract FitnessOracle {
      * @param score         0–100 fitness score
      * @param benchmarkHash keccak256 of benchmark prompts used in evaluation
      * @param teeSignature  ECDSA sig from TEE node
-     *                      Message: keccak256(genomeId, score, benchmarkHash, mrEnclave)
+     *                      Message: keccak256(chainId, oracle, genomeId, score, benchmarkHash, mrEnclave)
      */
     function submitFitness(
         uint256        genomeId,
@@ -144,10 +155,18 @@ contract FitnessOracle {
         bytes calldata teeSignature
     ) external {
         require(genome != address(0), "FitnessOracle: genome not set");
+        require(score <= 100, "FitnessOracle: score > 100");
 
         // Verify TEE signature includes mrEnclave for enclave binding
         bytes32 msgHash = keccak256(
-            abi.encodePacked(genomeId, score, benchmarkHash, trustedEnclave)
+            abi.encodePacked(
+                block.chainid,
+                address(this),
+                genomeId,
+                score,
+                benchmarkHash,
+                trustedEnclave
+            )
         );
         bytes32 ethHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", msgHash)
@@ -178,6 +197,7 @@ contract FitnessOracle {
         }
         if (v < 27) v += 27;
         require(v == 27 || v == 28, "FitnessOracle: bad v");
+        require(uint256(s) <= SECP256K1N_HALF, "FitnessOracle: bad s");
         return ecrecover(h, v, r, s);
     }
 

@@ -111,6 +111,16 @@ function DagDetail() {
                   <div><dt className="text-muted-foreground text-xs">Payout</dt><dd className="font-mono mt-1 text-signal">{node.payout ? `${node.payout.toFixed(3)} OG` : "-"}</dd></div>
                   <div className="col-span-2"><dt className="text-muted-foreground text-xs">Assigned Agent</dt><dd className="font-mono mt-1 truncate text-xs">{node.agentId || "-"}</dd></div>
                   <div className="col-span-2"><dt className="text-muted-foreground text-xs">TEE Verification Score</dt><dd className="font-mono mt-1 text-accent">{node.score ?? "-"}</dd></div>
+                  {(node.inputSchemaURI || node.outputSchemaURI || node.qualityRubricURI) && (
+                    <div className="col-span-2">
+                      <dt className="text-muted-foreground text-xs">Metadata URIs</dt>
+                      <dd className="font-mono mt-1 text-[10px] break-all">
+                        {[node.inputSchemaURI, node.outputSchemaURI, node.qualityRubricURI]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </>
             )}

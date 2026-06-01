@@ -1,7 +1,6 @@
 import hardhat from "hardhat";
 const { ethers } = hardhat;
 
-
 async function main() {
   const [deployer] = await ethers.getSigners();
   const AGENT_REGISTRY_ADDR = process.env.VITE_CONTRACT_AGENT_REGISTRY;
@@ -11,11 +10,11 @@ async function main() {
   console.log("Updating MIN_STAKE on AgentRegistry at:", AGENT_REGISTRY_ADDR);
   const AgentRegistry = await ethers.getContractAt("AgentRegistry", AGENT_REGISTRY_ADDR);
 
-  const newMin = ethers.parseEther("0.01");
+  const newMin = ethers.parseEther("0.05");
   const tx = await AgentRegistry.setMinStake(newMin);
   await tx.wait();
 
-  console.log("Success! MIN_STAKE updated to 0.01 OG");
+  console.log("Success! MIN_STAKE updated to 0.05 OG");
 }
 
 main().catch((error) => {

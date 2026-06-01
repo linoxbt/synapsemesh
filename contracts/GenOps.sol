@@ -18,6 +18,8 @@ uint32, uint8, bytes32, uint8, uint256, uint256, bytes32
 );
 
 function isActive(uint256 id) external view returns (bool);
+function ownerOf(uint256 tokenId) external view returns (address);
+function updateAdapterRoot(uint256 genomeId, bytes32 newAdapterRoot) external;
 }
 
 /**
@@ -77,6 +79,7 @@ contract GenOps {
     event GenomeSet(address genome);
     event BreedingFeeUpdated(uint256 newFee);
     event MutationRateUpdated(uint256 newRate);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ─────────────────────────────────────────────────────────────
     //  Modifiers
@@ -103,6 +106,8 @@ contract GenOps {
         uint256 _mutationRate
     ) {
         require(_treasury != address(0), "zero treasury");
+        require(_evoClock != address(0), "zero evoClock");
+        require(_mutationRate <= 10000, "GenOps: rate > 100%");
         evoClock     = _evoClock;
         treasury     = _treasury;
         breedingFee  = _breedingFee;
@@ -135,6 +140,13 @@ contract GenOps {
         MAX_BREED_COUNT = _max;
     }
 
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "GenOps: zero owner");
+        address previous = owner;
+        owner = newOwner;
+        emit OwnershipTransferred(previous, newOwner);
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  Genetic operators
     // ─────────────────────────────────────────────────────────────
@@ -162,6 +174,7 @@ contract GenOps {
         require(msg.value >= breedingFee,          "GenOps: insufficient breeding fee");
         require(alpha <= 100,                      "GenOps: alpha out of range");
         require(parentA != parentB,                "GenOps: same parent");
+        require(childAdapterRoot != bytes32(0),    "GenOps: zero child root");
         require(IModelGenome(genome).isActive(parentA), "GenOps: parentA not active");
         require(IModelGenome(genome).isActive(parentB), "GenOps: parentB not active");
         require(crossoverCount[parentA] < MAX_BREED_COUNT, "GenOps: parentA over breed limit");
@@ -191,15 +204,18 @@ contract GenOps {
     function mutate(
         uint256 genomeId,
         bytes32 newAdapterRoot
-    ) external onlyOwner {
+    ) external {
         require(genome != address(0), "GenOps: genome not set");
         require(IModelGenome(genome).isActive(genomeId), "GenOps: genome not active");
+        require(newAdapterRoot != bytes32(0), "GenOps: zero adapter root");
+        require(
+            msg.sender == owner || IModelGenome(genome).ownerOf(genomeId) == msg.sender,
+            "GenOps: not genome owner"
+        );
 
         lastMutatedAt[genomeId] = block.number;
+        IModelGenome(genome).updateAdapterRoot(genomeId, newAdapterRoot);
         emit MutationTriggered(genomeId, newAdapterRoot);
-
-        // Note: adapter root update on ModelGenome requires an updateAdapterRoot()
-        // function — add to ModelGenome if mutation is needed post-mint.
     }
 
     /**

@@ -6,22 +6,57 @@ export const Route = createFileRoute("/protocol")({
   head: () => ({
     meta: [
       { title: "Protocol - SynapseMesh" },
-      { name: "description", content: "The seven onchain components powering SynapseMesh: Task DAGs, MeshEscrow, AgentRegistry, BidAuction, TEEVerifierBridge and more." },
+      {
+        name: "description",
+        content:
+          "The seven onchain components powering SynapseMesh: Task DAGs, MeshEscrow, AgentRegistry, BidAuction, TEEVerifierBridge and more.",
+      },
       { property: "og:title", content: "Protocol - SynapseMesh" },
-      { property: "og:description", content: "Onchain components and contract surface of SynapseMesh." },
+      {
+        property: "og:description",
+        content: "Onchain components and contract surface of SynapseMesh.",
+      },
     ],
   }),
   component: ProtocolPage,
 });
 
 const contracts = [
-  { n: "TaskDAG.sol", role: "Graph", d: "Submits, validates and topologically sorts the DAG. Cycle detection at submission time. Stores node metadata roots; full specs live on 0G Storage Log." },
-  { n: "MeshEscrow.sol", role: "Settlement", d: "Locks per-node budgets at DAG submission. Releases atomically on TEE attestation. Slashes the agent's stake on failure." },
-  { n: "AgentRegistry.sol", role: "Identity", d: "Every agent is an ERC-7857 Intelligent NFT. Carries reputation, capability proofs and historical attestations." },
-  { n: "BidAuction.sol", role: "Market", d: "Reputation-weighted auction (price 0.4 / reputation 0.4 / ETA 0.2). Multi-node bidding for pipelined execution." },
-  { n: "TEEVerifierBridge.sol", role: "Verification", d: "Receives signed attestations from 0G Compute TEE. Validates the attestation, posts the score, triggers MeshEscrow." },
-  { n: "OpenClawAdapter.sol", role: "Compatibility", d: "Wraps OpenClaw Skills as native DAG nodes. Makes SynapseMesh a deployment surface for the OpenClaw ecosystem." },
-  { n: "ReputationOracle.sol", role: "Trust", d: "EWMA aggregation of historical TEE scores. Decay model penalises inactivity. Read freely by the auction contract." },
+  {
+    n: "TaskDAG.sol",
+    role: "Graph",
+    d: "Submits, validates and topologically sorts the DAG. Cycle detection at submission time. Stores node metadata roots; full specs live on 0G Storage Log.",
+  },
+  {
+    n: "MeshEscrow.sol",
+    role: "Settlement",
+    d: "Locks per-node budgets at DAG submission. Releases atomically on TEE attestation. Slashes the agent's stake on failure.",
+  },
+  {
+    n: "AgentRegistry.sol",
+    role: "Identity",
+    d: "Every agent is a stake-backed registry entry with reputation, operator address, earnings and historical attestations.",
+  },
+  {
+    n: "BidAuction.sol",
+    role: "Market",
+    d: "Reputation-weighted auction (price 0.4 / reputation 0.4 / ETA 0.2). Multi-node bidding for pipelined execution.",
+  },
+  {
+    n: "TEEVerifierBridge.sol",
+    role: "Verification",
+    d: "Receives signed attestations from 0G Compute TEE. Validates the attestation, posts the score, triggers MeshEscrow.",
+  },
+  {
+    n: "OpenClawAdapter.sol",
+    role: "Compatibility",
+    d: "Wraps OpenClaw Skills as native DAG nodes. Makes SynapseMesh a deployment surface for the OpenClaw ecosystem.",
+  },
+  {
+    n: "ReputationOracle.sol",
+    role: "Trust",
+    d: "EWMA aggregation of historical TEE scores. Decay model penalises inactivity. Read freely by the auction contract.",
+  },
 ];
 
 function ProtocolPage() {
@@ -36,8 +71,8 @@ function ProtocolPage() {
               Seven contracts, one <em className="italic text-accent">trustless</em> economy.
             </h1>
             <p className="text-muted-foreground text-lg mt-6 max-w-2xl">
-              Every component is onchain or attested-onchain. No offchain orchestrator, no privileged
-              admin keys, no hidden coordinator.
+              Every component is onchain or attested-onchain. No offchain orchestrator, no
+              privileged admin keys, no hidden coordinator.
             </p>
           </div>
         </section>
@@ -59,12 +94,13 @@ function ProtocolPage() {
             <div className="lg:col-span-5">
               <h2 className="editorial-h2 text-4xl">The TaskNode struct</h2>
               <p className="text-muted-foreground mt-5 leading-relaxed">
-                Every node in a DAG is typed and hashed. Inputs, outputs and rubric live on 0G Storage Log,
-                referenced by content hash. Contracts only ever touch the roots - cheap, verifiable, immutable.
+                Every node in a DAG is typed and hashed. Inputs, outputs and rubric live on 0G
+                Storage Log, referenced by content hash. Contracts only ever touch the roots -
+                cheap, verifiable, immutable.
               </p>
             </div>
             <pre className="lg:col-span-7 card-soft p-6 overflow-x-auto text-xs font-mono leading-relaxed text-muted-foreground">
-{`struct TaskNode {
+              {`struct TaskNode {
   bytes32 taskId;
   bytes32 inputSchemaHash;    // full spec on 0G Storage
   bytes32 outputSchemaHash;
@@ -91,13 +127,20 @@ function submitDAG(bytes32 dagRoot, TaskNode[] calldata nodes)
 
         <section className="container-edge py-20">
           <div className="card-soft p-12 text-center">
-            <h2 className="editorial-h2 text-3xl md:text-5xl">Audited. Open. <em className="italic text-accent">Forkable.</em></h2>
+            <h2 className="editorial-h2 text-3xl md:text-5xl">
+              Audited. Open. <em className="italic text-accent">Forkable.</em>
+            </h2>
             <p className="text-muted-foreground mt-4 max-w-xl mx-auto">
-              MIT-licensed Solidity. Reproducible TEE images. Reference SDK in TypeScript and Python.
+              MIT-licensed Solidity. Reproducible TEE images. Reference SDK in TypeScript and
+              Python.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link to="/docs" className="btn-primary">Read the docs</Link>
-              <a href="#" className="btn-ghost">View on GitHub</a>
+              <Link to="/docs" className="btn-primary">
+                Read the docs
+              </Link>
+              <a href="#" className="btn-ghost">
+                View on GitHub
+              </a>
             </div>
           </div>
         </section>

@@ -8,6 +8,8 @@ function getSpeciesPopulation(bytes32 speciesId) external view returns (uint256[
 function isActive(uint256 genomeId) external view returns (bool);
 function ownerOf(uint256 tokenId) external view returns (address);
 function setThresholds(uint8 extinction, uint8 deployment) external;
+function EXTINCTION_THRESHOLD() external view returns (uint8);
+function DEPLOYMENT_THRESHOLD() external view returns (uint8);
 }
 
 interface IEvolutionClock {
@@ -16,6 +18,10 @@ function setEpochLength(uint256 newLen) external;
 
 interface IGenOps {
 function setMutationRate(uint256 rate) external;
+}
+
+interface IAgentRegistry {
+function setMinStake(uint256 minStake) external;
 }
 
 /**
@@ -88,6 +94,7 @@ contract GenomeDAO {
     address public genome;
     address public evoClock;
     address public genOps;
+    address public agentRegistry;
     address public owner;
 
     uint256 public proposalCount;
@@ -106,6 +113,8 @@ contract GenomeDAO {
     event ProposalExecuted(uint256 indexed id, bool passed);
     event QuorumUpdated(uint256 newQuorum);
     event VotingPeriodUpdated(uint256 newPeriod);
+    event AgentRegistryUpdated(address agentRegistry);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
     // ─────────────────────────────────────────────────────────────
     //  Modifiers
@@ -124,6 +133,7 @@ contract GenomeDAO {
         address _genome,
         address _evoClock,
         address _genOps,
+        address _agentRegistry,
         uint256 _votingPeriod,
         uint256 _quorum
     ) {
@@ -136,6 +146,7 @@ contract GenomeDAO {
         genome        = _genome;
         evoClock      = _evoClock;
         genOps        = _genOps;
+        agentRegistry = _agentRegistry;
         votingPeriod  = _votingPeriod;
         quorum        = _quorum;
         owner         = msg.sender;
@@ -152,17 +163,32 @@ contract GenomeDAO {
     // ─────────────────────────────────────────────────────────────
 
     function setQuorum(uint256 _quorum) external onlyOwner {
+        require(_quorum > 0, "GenomeDAO: zero quorum");
         quorum = _quorum;
         emit QuorumUpdated(_quorum);
     }
 
     function setVotingPeriod(uint256 _period) external onlyOwner {
+        require(_period > 0, "GenomeDAO: zero period");
         votingPeriod = _period;
         emit VotingPeriodUpdated(_period);
     }
 
     function addSpecies(bytes32 speciesId) external onlyOwner {
         registeredSpecies.push(speciesId);
+    }
+
+    function setAgentRegistry(address _agentRegistry) external onlyOwner {
+        require(_agentRegistry != address(0), "GenomeDAO: zero agentRegistry");
+        agentRegistry = _agentRegistry;
+        emit AgentRegistryUpdated(_agentRegistry);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "GenomeDAO: zero owner");
+        address previous = owner;
+        owner = newOwner;
+        emit OwnershipTransferred(previous, newOwner);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -183,6 +209,7 @@ contract GenomeDAO {
         string calldata description
     ) external returns (uint256) {
         require(_votingPower(msg.sender) > 0, "GenomeDAO: no voting power");
+        _validateProposal(pType, value);
 
         uint256 id = ++proposalCount;
 
@@ -246,8 +273,8 @@ contract GenomeDAO {
         bool passed = p.forVotes >= quorum && p.forVotes > p.againstVotes;
 
         if (passed) {
-            p.status = ProposalStatus.PASSED;
             _executeProposal(p);
+            p.status = ProposalStatus.EXECUTED;
         } else {
             p.status = ProposalStatus.FAILED;
         }
@@ -267,14 +294,43 @@ contract GenomeDAO {
             IEvolutionClock(evoClock).setEpochLength(p.value);
 
         } else if (p.pType == ProposalType.SET_EXTINCTION_THRESHOLD) {
-            // Get current deployment threshold and update extinction only
-            // Owner must ensure values remain valid (extinction < deployment)
-            IModelGenome(genome).setThresholds(uint8(p.value), 88);
+            uint8 deployment = IModelGenome(genome).DEPLOYMENT_THRESHOLD();
+            IModelGenome(genome).setThresholds(uint8(p.value), deployment);
 
         } else if (p.pType == ProposalType.SET_DEPLOYMENT_THRESHOLD) {
-            IModelGenome(genome).setThresholds(45, uint8(p.value));
+            uint8 extinction = IModelGenome(genome).EXTINCTION_THRESHOLD();
+            IModelGenome(genome).setThresholds(extinction, uint8(p.value));
+
+        } else if (p.pType == ProposalType.SET_MIN_STAKE) {
+            require(agentRegistry != address(0), "GenomeDAO: agent registry unset");
+            IAgentRegistry(agentRegistry).setMinStake(p.value);
         }
-        // CUSTOM and SET_MIN_STAKE require owner to execute manually
+        // CUSTOM is intentionally disabled until arbitrary-call governance is implemented.
+    }
+
+    function _validateProposal(ProposalType pType, uint256 value) internal view {
+        require(pType != ProposalType.CUSTOM, "GenomeDAO: custom disabled");
+
+        if (pType == ProposalType.SET_MUTATION_RATE) {
+            require(value <= 10000, "GenomeDAO: mutation > 100%");
+
+        } else if (pType == ProposalType.SET_EPOCH_LENGTH) {
+            require(value > 0, "GenomeDAO: zero epoch length");
+
+        } else if (pType == ProposalType.SET_EXTINCTION_THRESHOLD) {
+            uint8 deployment = IModelGenome(genome).DEPLOYMENT_THRESHOLD();
+            require(value < deployment, "GenomeDAO: extinction >= deployment");
+            require(value <= 100, "GenomeDAO: threshold > 100");
+
+        } else if (pType == ProposalType.SET_DEPLOYMENT_THRESHOLD) {
+            uint8 extinction = IModelGenome(genome).EXTINCTION_THRESHOLD();
+            require(value > extinction, "GenomeDAO: deployment <= extinction");
+            require(value <= 100, "GenomeDAO: threshold > 100");
+
+        } else if (pType == ProposalType.SET_MIN_STAKE) {
+            require(agentRegistry != address(0), "GenomeDAO: agent registry unset");
+            require(value > 0, "GenomeDAO: zero min stake");
+        }
     }
 
     /**

@@ -52,6 +52,7 @@ contract GenomeMarket {
 
     mapping(uint256 => Listing) public listings;  // genomeId => Listing
     mapping(uint256 => Rental)  public rentals;   // genomeId => Rental
+    mapping(uint256 => uint256) public rentalPrices; // genomeId => OG wei per block
 
     address public genome;
     address public treasury;
@@ -68,6 +69,7 @@ contract GenomeMarket {
     event Sold(uint256 indexed genomeId, address seller, address buyer, uint256 price);
     event Rented(uint256 indexed genomeId, address renter, uint256 expiresAt, uint256 totalPaid);
     event RentalExpired(uint256 indexed genomeId);
+    event RentalPriceSet(uint256 indexed genomeId, uint256 pricePerBlock);
     event FeeUpdated(uint256 newFeeBps);
 
     // ─────────────────────────────────────────────────────────────
@@ -129,6 +131,9 @@ contract GenomeMarket {
         );
         require(price > 0, "GenomeMarket: zero price");
         require(!listings[genomeId].active, "GenomeMarket: already listed");
+        require(!_isRented(genomeId), "GenomeMarket: rented");
+
+        nft.transferFrom(msg.sender, address(this), genomeId);
 
         listings[genomeId] = Listing({
             seller: msg.sender,
@@ -143,8 +148,18 @@ contract GenomeMarket {
         Listing storage l = listings[genomeId];
         require(l.active,             "GenomeMarket: not listed");
         require(l.seller == msg.sender || msg.sender == owner, "GenomeMarket: unauthorized");
+        address seller = l.seller;
         l.active = false;
-        emit Delisted(genomeId, l.seller);
+        IERC721(genome).transferFrom(address(this), seller, genomeId);
+        emit Delisted(genomeId, seller);
+    }
+
+    function setRentalPrice(uint256 genomeId, uint256 pricePerBlock) external {
+        IERC721 nft = IERC721(genome);
+        require(nft.ownerOf(genomeId) == msg.sender, "GenomeMarket: not owner");
+        require(!listings[genomeId].active, "GenomeMarket: listed for sale");
+        rentalPrices[genomeId] = pricePerBlock;
+        emit RentalPriceSet(genomeId, pricePerBlock);
     }
 
     /**
@@ -154,6 +169,7 @@ contract GenomeMarket {
         Listing storage l = listings[genomeId];
         require(l.active,           "GenomeMarket: not listed");
         require(msg.value >= l.price, "GenomeMarket: insufficient payment");
+        require(!_isRented(genomeId), "GenomeMarket: rented");
 
         address seller = l.seller;
         uint256 price  = l.price;
@@ -163,16 +179,16 @@ contract GenomeMarket {
         uint256 fee       = (price * platformFeeBps) / 10000;
         uint256 sellerAmt = price - fee;
 
-        // Transfer NFT to buyer
-        IERC721(genome).transferFrom(seller, msg.sender, genomeId);
+        // Listed NFTs are held in escrow by this contract.
+        IERC721(genome).transferFrom(address(this), msg.sender, genomeId);
 
         // Pay seller and treasury
-        payable(seller).transfer(sellerAmt);
-        payable(treasury).transfer(fee);
+        _sendValue(seller, sellerAmt);
+        _sendValue(treasury, fee);
 
         // Refund excess
         if (msg.value > price) {
-            payable(msg.sender).transfer(msg.value - price);
+            _sendValue(msg.sender, msg.value - price);
         }
 
         emit Sold(genomeId, seller, msg.sender, price);
@@ -188,15 +204,15 @@ contract GenomeMarket {
      *
      * @param genomeId       Token ID to rent
      * @param blocks         Number of blocks to rent for
-     * @param pricePerBlock  OG wei per block (set by owner off-chain / via listing)
      */
     function rent(
         uint256 genomeId,
-        uint256 blocks,
-        uint256 pricePerBlock
+        uint256 blocks
     ) external payable {
         require(blocks > 0,           "GenomeMarket: zero blocks");
+        uint256 pricePerBlock = rentalPrices[genomeId];
         require(pricePerBlock > 0,    "GenomeMarket: zero price");
+        require(!listings[genomeId].active, "GenomeMarket: listed for sale");
 
         uint256 totalCost = blocks * pricePerBlock;
         require(msg.value >= totalCost, "GenomeMarket: insufficient payment");
@@ -220,11 +236,11 @@ contract GenomeMarket {
             pricePerBlock: pricePerBlock
         });
 
-        payable(nftOwner).transfer(ownerAmt);
-        payable(treasury).transfer(fee);
+        _sendValue(nftOwner, ownerAmt);
+        _sendValue(treasury, fee);
 
         if (msg.value > totalCost) {
-            payable(msg.sender).transfer(msg.value - totalCost);
+            _sendValue(msg.sender, msg.value - totalCost);
         }
 
         emit Rented(genomeId, msg.sender, block.number + blocks, totalCost);
@@ -243,6 +259,10 @@ contract GenomeMarket {
     }
 
     function isRented(uint256 genomeId) external view returns (bool) {
+        return _isRented(genomeId);
+    }
+
+    function _isRented(uint256 genomeId) internal view returns (bool) {
         Rental memory r = rentals[genomeId];
         return r.renter != address(0) && block.number <= r.expiresAt;
     }
@@ -251,5 +271,11 @@ contract GenomeMarket {
         Rental memory r = rentals[genomeId];
         if (block.number <= r.expiresAt) return r.renter;
         return address(0);
+    }
+
+    function _sendValue(address to, uint256 amount) internal {
+        if (amount == 0) return;
+        (bool ok, ) = payable(to).call{value: amount}("");
+        require(ok, "GenomeMarket: transfer failed");
     }
 }

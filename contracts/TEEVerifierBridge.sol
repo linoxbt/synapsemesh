@@ -5,15 +5,19 @@ pragma solidity ^0.8.20;
 
 interface IMeshEscrow {
 function release(bytes32 taskId, address agent) external;
+function getBudget(bytes32 taskId) external view returns (uint256);
 }
 
 interface IAgentRegistry {
 function incrementReputation(address agent, uint8 score) external;
 function slash(address agent) external;
+function recordEarnings(address agent, uint256 amount) external;
 }
 
 interface IDAGRegistry {
 function markNodeComplete(bytes32 taskId) external;
+function markNodeFailedByTEE(bytes32 taskId) external;
+function getAssignedAgent(bytes32 taskId) external view returns (address);
 }
 
 /**
@@ -63,6 +67,8 @@ contract TEEVerifierBridge {
     address public owner;
 
     uint8 public MIN_QUALITY = 70; // minimum score to pass (0–100)
+    uint256 private constant SECP256K1N_HALF =
+        0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0;
 
     mapping(bytes32 => bool) public processed; // taskId => already verified
 
@@ -74,7 +80,8 @@ contract TEEVerifierBridge {
         bytes32 indexed taskId,
         address indexed agent,
         bool    passed,
-        uint8   score
+        uint8   score,
+        uint256 payout
     );
     event SignerUpdated(address newSigner);
     event EnclaveUpdated(bytes32 newMrEnclave);
@@ -146,7 +153,8 @@ contract TEEVerifierBridge {
      * @param score         quality score 0–100 from TEE
      * @param teeSignature  ECDSA signature from the TEE node
      *                      — must be signed by TEE_SIGNER_ADDRESS
-     *                      — message: keccak256(taskId, passed, score, mrEnclave)
+     *                      — message: keccak256(chainId, verifier, taskId,
+     *                        assignedAgent, passed, score, mrEnclave)
      */
     function submitVerification(
         bytes32        taskId,
@@ -157,10 +165,23 @@ contract TEEVerifierBridge {
     ) external {
         require(!processed[taskId],           "TEEVerifier: already processed");
         require(assignedAgent != address(0),  "TEEVerifier: zero agent");
+        require(score <= 100,                 "TEEVerifier: score > 100");
+        require(
+            dagReg.getAssignedAgent(taskId) == assignedAgent,
+            "TEEVerifier: agent mismatch"
+        );
 
         // Reconstruct signed message including mrEnclave for enclave binding
         bytes32 msgHash = keccak256(
-            abi.encodePacked(taskId, passed, score, trustedMrEnclave)
+            abi.encodePacked(
+                block.chainid,
+                address(this),
+                taskId,
+                assignedAgent,
+                passed,
+                score,
+                trustedMrEnclave
+            )
         );
         bytes32 ethHash = keccak256(
             abi.encodePacked("\x19Ethereum Signed Message:\n32", msgHash)
@@ -174,14 +195,17 @@ contract TEEVerifierBridge {
 
         processed[taskId] = true;
 
-        emit VerificationSubmitted(taskId, assignedAgent, passed, score);
-
         if (passed && score >= MIN_QUALITY) {
+            uint256 payout = escrow.getBudget(taskId);
             escrow.release(taskId, assignedAgent);
             agentReg.incrementReputation(assignedAgent, score);
+            agentReg.recordEarnings(assignedAgent, payout);
             dagReg.markNodeComplete(taskId);
+            emit VerificationSubmitted(taskId, assignedAgent, true, score, payout);
         } else {
             agentReg.slash(assignedAgent);
+            dagReg.markNodeFailedByTEE(taskId);
+            emit VerificationSubmitted(taskId, assignedAgent, false, score, 0);
         }
     }
 
@@ -201,6 +225,7 @@ contract TEEVerifierBridge {
         }
         if (v < 27) v += 27;
         require(v == 27 || v == 28, "TEEVerifier: bad v");
+        require(uint256(s) <= SECP256K1N_HALF, "TEEVerifier: bad s");
         return ecrecover(h, v, r, s);
     }
 

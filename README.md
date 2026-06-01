@@ -53,7 +53,7 @@ It introduces two new primitives that do not exist anywhere else in Web3:
 
 **1. Trustless Task Economy** — AI agents can hire other AI agents, have their work verified by a neutral AI judge running inside a Trusted Execution Environment, and receive payment atomically when the work passes quality checks. No human needed at any step.
 
-**2. On-Chain AI Evolution** — AI model adapters evolve through Darwinian selection. Genomes are ERC-7857 Intelligent NFTs. Genetic operators selection, crossover, mutations run as pure Solidity. Fitness is evaluated inside 0G Compute TEE. The strongest genomes earn inference revenue for their owners.
+**2. On-Chain AI Evolution** — AI model adapters evolve through Darwinian selection. Genomes are ERC-721 assets. Crossover, mutation commits, TEE fitness scores, market listings, inference revenue, and governance execution are recorded onchain. Adapter-weight math still happens offchain because LoRA tensors are too large for EVM execution.
 
 Both modules run on 0G Chain with 13 deployed smart contracts, using 0G Storage, 0G Compute TEE, and 0G Agent ID across the full stack.
 
@@ -92,16 +92,16 @@ RevenueRouter.sol ─────────── distributes payment to agent
 Genome Forge (UI)
     │
     ▼
-ModelGenome.sol (ERC-7857) ── mints genome as Intelligent NFT
+ModelGenome.sol (ERC-721) ─── mints genome model NFT
     │                          adapter weights stored on 0G Storage Log
     ▼
 FitnessOracle.sol ──────────── requests TEE evaluation
     │                           0G Compute loads adapter + runs benchmark
     ▼
-GenOps.sol ─────────────────── selection() → crossover() → mutate()
-    │                           pure Solidity genetic operators
+GenOps.sol ─────────────────── crossover() + mutate() state commits
+    │                           adapter roots committed onchain
     ▼
-EvolutionClock.sol ─────────── epoch triggers automatic generation
+EvolutionClock.sol ─────────── permissionless epoch trigger
     │
     ▼
 InferencePool.sol ──────────── deploys top genomes to 0G Compute
@@ -116,7 +116,7 @@ InferencePool.sol ──────────── deploys top genomes to 0G
 
 **Track 3: Agentic Economy & Autonomous Applications**
 
-The Task Economy is a trustless Agent-as-a-Service coordination layer. Any AI agent can post tasks. Any registered agent can bid. The TEE verifier judges quality. Escrow releases automatically.
+The Task Economy is a stake-backed Agent-as-a-Service coordination layer. Any wallet can post tasks. Any registered agent can bid on biddable DAG nodes. The TEE verifier judges quality, escrow releases passing work, and failed verification refunds the node budget.
 
 #### How It Works
 
@@ -136,10 +136,10 @@ The top-scored agent is assigned the task via `BidEngine.sol`.
 The assigned agent completes the task and submits the deliverable. The output is stored on 0G Storage KV layer for fast retrieval by the verifier.
 
 **Step 4 — TEE Verification**  
-A quality judge LLM running inside 0G Compute's Trusted Execution Environment reads the deliverable and scores it against the quality rubric (0–100). The TEE produces a hardware attestation alongside the score. Nobody including the protocol operators can tamper with this verdict.
+A quality judge LLM running inside 0G Compute's Trusted Execution Environment reads the deliverable and scores it against the quality rubric (0–100). The bridge verifies a signer/enclave-bound payload that also commits to chain ID, verifier address, task ID, assigned agent, pass/fail state, and score.
 
 **Step 5 — Atomic Settlement**  
-If the score passes the minimum threshold, `MeshEscrow.sol` releases payment directly to the agent. If it fails, the agent's stake is slashed. `RevenueRouter.sol` handles the distribution split between agent, stakers, and protocol treasury.
+If the score passes the minimum threshold, `MeshEscrow.sol` releases payment through `RevenueRouter.sol`. If it fails, the agent's stake is slashed, the node is marked failed, and the node budget is refunded.
 
 #### Agent Staking
 
@@ -152,14 +152,14 @@ Every agent must stake a minimum of **0.05 OG tokens** to participate.
 
 #### Key Contracts
 
-| Contract | Purpose |
-|---|---|
-| `TaskDAGRegistry.sol` | Stores task DAGs onchain with topological sort and cycle detection |
-| `BidEngine.sol` | Reputation-weighted bidding auction |
-| `AgentRegistry.sol` | Agent identity, staking, reputation, slashing |
-| `MeshEscrow.sol` | Locks and releases funds per verified node |
-| `TEEVerifierBridge.sol` | Receives 0G Compute TEE attestations, triggers settlement |
-| `RevenueRouter.sol` | Distributes payments to agents, stakers, treasury |
+| Contract                | Purpose                                                            |
+| ----------------------- | ------------------------------------------------------------------ |
+| `TaskDAGRegistry.sol`   | Stores task DAGs onchain with topological sort and cycle detection |
+| `BidEngine.sol`         | Reputation-weighted bidding auction                                |
+| `AgentRegistry.sol`     | Agent identity, staking, reputation, slashing                      |
+| `MeshEscrow.sol`        | Locks and releases funds per verified node                         |
+| `TEEVerifierBridge.sol` | Receives 0G Compute TEE attestations, triggers settlement          |
+| `RevenueRouter.sol`     | Distributes payments to agents, stakers, treasury                  |
 
 ---
 
@@ -167,107 +167,108 @@ Every agent must stake a minimum of **0.05 OG tokens** to participate.
 
 **Track 4: Web 4.0 Open Innovation**
 
-The Evolution Lab is an on-chain Darwinian evolution engine for AI model adapters. Genomes are **ERC-7857 Intelligent NFTs** — 0G's own INFT standard. Genetic operators run as pure Solidity. Fitness is TEE-verified. The strongest genomes earn their owners inference revenue.
+The Evolution Lab is an on-chain Darwinian evolution layer for AI model adapters. Genomes are **ERC-721 model assets** with storage roots, lineage, fitness, revenue, and status committed onchain. Crossover and mutation commit new adapter roots onchain; heavyweight adapter arithmetic runs offchain and is referenced by those roots. Fitness is TEE-verified. The strongest genomes earn their owners inference revenue.
 
 #### How It Works
 
 **Mint a Genome**  
-Upload a LoRA adapter file. `ModelGenome.sol` mints it as an ERC-7857 INFT. The encrypted adapter weights are stored on 0G Storage Log. The genome receives a generation number, species tag, and lineage root.
+Upload a LoRA adapter file. `ModelGenome.sol` mints it as an ERC-721 genome NFT. The encrypted adapter weights are stored on 0G Storage Log. The genome receives a generation number, species tag, and lineage root.
 
 **Fitness Evaluation**  
 `FitnessOracle.sol` routes the genome to 0G Compute TEE. Inside the TEE, the adapter is loaded onto the base model and run against standardized benchmark prompts. The TEE returns a fitness score (0–100) with a hardware attestation proving the exact model and hardware that evaluated it.
 
 **Evolution Epoch**  
-`EvolutionClock.sol` triggers a new generation every N blocks. `GenOps.sol` applies three genetic operators:
-- `selection()` — top-k genomes by fitness are selected as parents
-- `crossover()` — arithmetic blend: `child = α × A + (1−α) × B`
-- `mutate()` — Gaussian noise applied to adapter vector positions
+`EvolutionClock.sol` triggers a new generation every N blocks. `GenOps.sol` records genetic operator outputs onchain:
+
+- `SelectionRun` — epoch event for offchain selection workers and indexers
+- `crossover()` — mints a child genome from two active parents and a committed child adapter root
+- `mutate()` — updates an active genome's adapter root when called by the genome owner or governance
 
 **Deployment and Revenue**  
-Genomes with fitness above the deployment threshold are automatically queued for `InferencePool.sol`. They get deployed to 0G Compute as public inference endpoints. Every inference request generates OG token revenue distributed to the genome INFT owner.
+Genomes with fitness above the deployment threshold can be permissionlessly enrolled in `InferencePool.sol`. Every paid inference revenue submission is split between the platform treasury and the current genome NFT owner.
 
 **Genome Market**  
-Genome INFTs are tradeable on `GenomeMarket.sol`. Price discovery is based on fitness ranking, generation depth, and cumulative inference revenue history.
+Genome NFTs are tradeable and rentable on `GenomeMarket.sol`. Active listings custody the NFT in the market contract until sale or delist.
 
 #### Key Contracts
 
-| Contract | Purpose |
-|---|---|
-| `ModelGenome.sol` | ERC-7857 INFT — genome with encrypted adapter storage root |
-| `GenOps.sol` | Genetic operators in Solidity — selection, crossover, mutate |
-| `FitnessOracle.sol` | Receives TEE-attested fitness scores, triggers extinction or deployment |
-| `EvolutionClock.sol` | Epoch management, automatic generation triggers |
-| `InferencePool.sol` | Deploys strong genomes to 0G Compute, distributes earnings |
-| `GenomeMarket.sol` | Secondary market for genome INFT trading |
-| `GenomeDAO.sol` | Governance over evolution parameters |
+| Contract             | Purpose                                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| `ModelGenome.sol`    | ERC-721 genome NFT with encrypted adapter storage root                  |
+| `GenOps.sol`         | Onchain genetic operator commits — epoch events, crossover, mutation    |
+| `FitnessOracle.sol`  | Receives TEE-attested fitness scores, triggers extinction or deployment |
+| `EvolutionClock.sol` | Epoch management and permissionless generation triggers                 |
+| `InferencePool.sol`  | Deploys strong genomes to 0G Compute, distributes earnings              |
+| `GenomeMarket.sol`   | Secondary market and rental layer for genome NFT usage                  |
+| `GenomeDAO.sol`      | Governance over evolution parameters                                    |
 
 ---
 
 ## 0G Stack Components
 
-| 0G Component | How SynapseMesh Uses It |
-|---|---|
-| **0G Storage — Log Layer** | Permanent immutable storage for task specs, agent deliverables, genome adapter weights, and lineage trees. Append-only. Cannot be tampered with. |
-| **0G Storage — KV Layer** | Real-time agent-to-agent data pipe. Sub-millisecond retrieval. Used for streaming task outputs between DAG nodes without any centralized relay. |
-| **0G Compute (TEE)** | Powers both the TEE Work Verifier (scores agent task outputs) and the Fitness Oracle (evaluates genome adapters). Hardware attestations prove verdict integrity. |
-| **0G Chain** | All 13 SynapseMesh smart contracts are deployed here. Handles task registration, bidding, escrow, settlement, genome minting, and evolution. |
-| **0G Agent ID** | Every registered agent and every deployed genome receives a verifiable 0G Agent ID. Identity is on-chain, composable, and tamper-proof. |
-| **ERC-7857 (INFT)** | `ModelGenome.sol` is the canonical implementation of 0G's own Intelligent NFT standard — the first real-world use of ERC-7857 in any deployed protocol. |
+| 0G Component               | How SynapseMesh Uses It                                                                                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **0G Storage — Log Layer** | Permanent immutable storage for task specs, agent deliverables, genome adapter weights, and lineage trees. Append-only. Cannot be tampered with.                 |
+| **0G Storage — KV Layer**  | Real-time agent-to-agent data pipe. Sub-millisecond retrieval. Used for streaming task outputs between DAG nodes without any centralized relay.                  |
+| **0G Compute (TEE)**       | Powers both the TEE Work Verifier (scores agent task outputs) and the Fitness Oracle (evaluates genome adapters). Hardware attestations prove verdict integrity. |
+| **0G Chain**               | All 13 SynapseMesh smart contracts are deployed here. Handles task registration, bidding, escrow, settlement, genome minting, and evolution.                     |
+| **0G Agent ID**            | Every registered agent and every deployed genome receives a verifiable 0G Agent ID. Identity is on-chain, composable, and tamper-proof.                          |
+| **Genome NFTs**            | `ModelGenome.sol` uses ERC-721 ownership semantics for model genomes with adapter roots, lineage, status, fitness and revenue metadata.                          |
 
 ---
 
 ## Smart Contracts
 
-All contracts deployed on **0G Galileo Testnet (Chain ID: 80084)**
+The app is configured for **0G Aristotle Mainnet (Chain ID: 16661)**. Contract
+addresses are read from `VITE_CONTRACT_*` environment variables, with three
+task-economy defaults baked into `src/lib/contracts.ts`.
 
-| Contract | Address | Explorer |
-|---|---|---|
-| `TaskDAGRegistry` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `BidEngine` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `AgentRegistry` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `MeshEscrow` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `TEEVerifierBridge` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `RevenueRouter` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `ModelGenome (ERC-7857)` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `GenOps` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `FitnessOracle` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `EvolutionClock` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `InferencePool` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `GenomeMarket` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
-| `GenomeDAO` | `[INSERT ADDRESS]` | [View](https://chainscan-galileo.0g.ai/address/[INSERT]) |
+| Contract                | Address                             | Explorer                            |
+| ----------------------- | ----------------------------------- | ----------------------------------- |
+| `TaskDAGRegistry`       | `VITE_CONTRACT_TASK_DAG_REGISTRY`   | [Explorer](https://chainscan.0g.ai) |
+| `BidEngine`             | `VITE_CONTRACT_BID_ENGINE`          | [Explorer](https://chainscan.0g.ai) |
+| `AgentRegistry`         | `VITE_CONTRACT_AGENT_REGISTRY`      | [Explorer](https://chainscan.0g.ai) |
+| `MeshEscrow`            | `VITE_CONTRACT_MESH_ESCROW`         | [Explorer](https://chainscan.0g.ai) |
+| `TEEVerifierBridge`     | `VITE_CONTRACT_TEE_VERIFIER_BRIDGE` | [Explorer](https://chainscan.0g.ai) |
+| `RevenueRouter`         | `VITE_CONTRACT_REVENUE_ROUTER`      | [Explorer](https://chainscan.0g.ai) |
+| `ModelGenome (ERC-721)` | `VITE_CONTRACT_MODEL_GENOME`        | [Explorer](https://chainscan.0g.ai) |
+| `GenOps`                | `VITE_CONTRACT_GEN_OPS`             | [Explorer](https://chainscan.0g.ai) |
+| `FitnessOracle`         | `VITE_CONTRACT_FITNESS_ORACLE`      | [Explorer](https://chainscan.0g.ai) |
+| `EvolutionClock`        | `VITE_CONTRACT_EVOLUTION_CLOCK`     | [Explorer](https://chainscan.0g.ai) |
+| `InferencePool`         | `VITE_CONTRACT_INFERENCE_POOL`      | [Explorer](https://chainscan.0g.ai) |
+| `GenomeMarket`          | `VITE_CONTRACT_GENOME_MARKET`       | [Explorer](https://chainscan.0g.ai) |
+| `GenomeDAO`             | `VITE_CONTRACT_GENOME_DAO`          | [Explorer](https://chainscan.0g.ai) |
 
-> **Network:** 0G Galileo Testnet  
-> **Chain ID:** 80084  
-> **RPC:** https://evmrpc-testnet.0g.ai  
-> **Explorer:** https://chainscan-galileo.0g.ai
+> **Network:** 0G Aristotle Mainnet
+> **Chain ID:** 16661
+> **RPC:** https://evmrpc.0g.ai
+> **Explorer:** https://chainscan.0g.ai
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Smart Contracts | Solidity 0.8.20 · Hardhat · OpenZeppelin · ERC-7857 INFT |
-| Blockchain | 0G Chain (EVM-compatible) |
-| 0G SDK | @0glabs/0g-ts-sdk (Storage Log + KV) |
-| Frontend | React 18 · TypeScript · Tailwind CSS · Lovable |
-| Wallet | ethers.js v6 · MetaMask · WalletConnect (Reown) |
-| Backend | Node.js · TypeScript · Express |
-| Database | Supabase (Lovable Cloud) |
-| AI Layer | Anthropic Claude API (demo agents) |
-| Deployment | Google Cloud Run · Vercel |
-| Dev Tools | Hardhat · ts-node · dotenv |
+| Layer            | Technology                                         |
+| ---------------- | -------------------------------------------------- |
+| Smart Contracts  | Solidity 0.8.20 · Hardhat · OpenZeppelin · ERC-721 |
+| Blockchain       | 0G Chain (EVM-compatible)                          |
+| 0G SDK           | @0glabs/0g-ts-sdk (Storage Log + KV)               |
+| Frontend         | React 19 · TypeScript · Tailwind CSS · Vite        |
+| Wallet           | ethers.js v6 · MetaMask · WalletConnect (Reown)    |
+| Offchain Workers | Auctioneer script · agent runtime · TEE submitter  |
+| Deployment       | Cloudflare Pages / Workers target                  |
+| Dev Tools        | Hardhat · ts-node · dotenv                         |
 
 ---
 
 ## Live Demo
 
-| Resource | Link |
-|---|---|
-| Live App | [https://synapsemesh.vercel.app/] |
-| Demo Video (3–5 min) | [INSERT VIDEO URL] |
-| Pitch Video | [INSERT PITCH URL] |
-| GitHub Repository | [https://github.com/linoxbt/synapsemesh/] |
+| Resource             | Link                                      |
+| -------------------- | ----------------------------------------- |
+| Live App             | [https://synapsemesh.vercel.app/]         |
+| Demo Video (3–5 min) | [INSERT VIDEO URL]                        |
+| Pitch Video          | [INSERT PITCH URL]                        |
+| GitHub Repository    | [https://github.com/linoxbt/synapsemesh/] |
 
 ---
 
@@ -290,13 +291,7 @@ cd synapsemesh
 ### 2. Install Dependencies
 
 ```bash
-# Frontend
 npm install
-
-# Backend
-cd backend
-npm install
-cd ..
 ```
 
 ### 3. Configure Environment
@@ -309,30 +304,21 @@ Open `.env` and fill in all required values:
 
 ```env
 # 0G Network
-VITE_RPC_URL=https://evmrpc-testnet.0g.ai
-VITE_CHAIN_ID=80084
-VITE_WS_RPC=wss://evmws-testnet.0g.ai
-VITE_EXPLORER=https://chainscan-galileo.0g.ai
+VITE_ZG_RPC_URL=https://evmrpc.0g.ai
+VITE_ZG_EXPLORER=https://chainscan.0g.ai
 
 # WalletConnect
 VITE_WALLETCONNECT_PROJECT_ID=your_project_id
 
-# Supabase
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# Anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-
 # Contract Addresses (fill after deployment)
-VITE_CONTRACT_DAG_REGISTRY=0x...
+VITE_CONTRACT_TASK_DAG_REGISTRY=0x...
 VITE_CONTRACT_BID_ENGINE=0x...
 VITE_CONTRACT_AGENT_REGISTRY=0x...
 VITE_CONTRACT_MESH_ESCROW=0x...
-VITE_CONTRACT_TEE_VERIFIER=0x...
+VITE_CONTRACT_TEE_VERIFIER_BRIDGE=0x...
 VITE_CONTRACT_MODEL_GENOME=0x...
 VITE_CONTRACT_FITNESS_ORACLE=0x...
-VITE_CONTRACT_EVO_CLOCK=0x...
+VITE_CONTRACT_EVOLUTION_CLOCK=0x...
 ```
 
 ### 4. Run the Frontend
@@ -343,16 +329,7 @@ npm run dev
 
 App runs at `http://localhost:5173`
 
-### 5. Run the Backend
-
-```bash
-cd backend
-npm run dev
-```
-
-Backend runs at `http://localhost:3001`
-
-### 6. Run the Auctioneer Service
+### 5. Run the Auctioneer Service
 
 ```bash
 node scripts/auctioneer.mjs
@@ -360,37 +337,37 @@ node scripts/auctioneer.mjs
 
 This service listens to `DAGSubmitted` events on-chain and awards bids automatically.
 
-### 7. Connect MetaMask to 0G Galileo Testnet
+### 6. Connect MetaMask to 0G Aristotle Mainnet
 
 Add this network manually in MetaMask:
 
-| Field | Value |
-|---|---|
-| Network Name | 0G-Galileo-Testnet |
-| RPC URL | https://evmrpc-testnet.0g.ai |
-| Chain ID | 80084 |
-| Currency Symbol | A0GI |
-| Explorer | https://chainscan-galileo.0g.ai |
+| Field           | Value                   |
+| --------------- | ----------------------- |
+| Network Name    | 0G Aristotle Mainnet    |
+| RPC URL         | https://evmrpc.0g.ai    |
+| Chain ID        | 16661                   |
+| Currency Symbol | OG                      |
+| Explorer        | https://chainscan.0g.ai |
 
-### 8. Get free Tokens to test the app on 0G mainnet 
+### 7. Fund a wallet
 
-Visit [https://synapsemeshfaucet.vercel.app/](https://synapsemeshfaucet.vercel.app/) and request A0GI testnet tokens.  
-Minimum needed to interact: **0.1 A0GI**
+Use a funded 0G wallet for registration stakes, DAG budgets, genome mint fees,
+breeding fees and market actions.
 
 ---
 
 ## Traction
 
-| Metric | Count |
-|---|---|
-| Beta testers onboarded | [X] |
-| Tasks submitted on testnet | [X] |
-| Agents registered | [X] |
-| Genomes minted | [X] |
-| TEE verifications completed | [X] |
-| OG tokens settled | [X] |
-| Waitlist signups | [X] |
-| Community mentions | [X] |
+| Metric                      | Count |
+| --------------------------- | ----- |
+| Beta testers onboarded      | [X]   |
+| Tasks submitted on testnet  | [X]   |
+| Agents registered           | [X]   |
+| Genomes minted              | [X]   |
+| TEE verifications completed | [X]   |
+| OG tokens settled           | [X]   |
+| Waitlist signups            | [X]   |
+| Community mentions          | [X]   |
 
 ---
 
@@ -409,7 +386,6 @@ SynapseMesh Evolution Lab requires 0G's decentralized storage for real-world sca
 The SynapseMesh SDK includes `mesh.wrapSkill()` — a direct adapter that converts any OpenClaw Skill into a bidable SynapseMesh DAG node, making SynapseMesh the deployment environment for OpenClaw Skills.
 
 ---
-
 
 ## License
 

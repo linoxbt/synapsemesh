@@ -63,6 +63,18 @@ contract TaskDAGRegistry {
         bool    complete;
     }
 
+    struct DAGMetadata {
+        string title;        // human-readable DAG title for explorers and dashboards
+        string metadataURI;  // optional 0G Storage / HTTPS pointer to full spec
+    }
+
+    struct NodeMetadata {
+        string label;             // human-readable node label
+        string inputSchemaURI;    // optional 0G Storage / HTTPS pointer
+        string outputSchemaURI;   // optional 0G Storage / HTTPS pointer
+        string qualityRubricURI;  // optional 0G Storage / HTTPS pointer
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  State
     // ─────────────────────────────────────────────────────────────
@@ -70,6 +82,9 @@ contract TaskDAGRegistry {
     mapping(bytes32 => DAG)          public dags;
     mapping(bytes32 => TaskNode)     public nodes;
     mapping(bytes32 => bytes32[])    public dagNodes;   // dagRoot => taskId[]
+    mapping(bytes32 => bytes32)      public nodeToDag;   // taskId => dagRoot
+    mapping(bytes32 => DAGMetadata)  public dagMetadata;
+    mapping(bytes32 => NodeMetadata) public nodeMetadata;
 
     address public bidEngine;
     address public teeVerifier;
@@ -81,6 +96,15 @@ contract TaskDAGRegistry {
     // ─────────────────────────────────────────────────────────────
 
     event DAGSubmitted(bytes32 indexed dagRoot, address requester, uint256 nodeCount, uint256 budget);
+    event DAGMetadataSubmitted(bytes32 indexed dagRoot, string title, string metadataURI);
+    event NodeMetadataSubmitted(
+        bytes32 indexed dagRoot,
+        bytes32 indexed taskId,
+        string label,
+        string inputSchemaURI,
+        string outputSchemaURI,
+        string qualityRubricURI
+    );
     event NodeStatusChanged(bytes32 indexed taskId, NodeStatus newStatus, address agent);
     event DAGCompleted(bytes32 indexed dagRoot);
 
@@ -148,6 +172,53 @@ contract TaskDAGRegistry {
         bytes32          dagRoot,
         TaskNode[] calldata taskNodes
     ) external payable {
+        _submitDAG(dagRoot, taskNodes);
+    }
+
+    /**
+     * @notice Submit a task DAG and publish UI/indexer metadata onchain.
+     * @dev Hash commitments remain in TaskNode. URIs point to the full text on 0G Storage.
+     */
+    function submitDAGWithMetadata(
+        bytes32 dagRoot,
+        TaskNode[] calldata taskNodes,
+        string calldata title,
+        string calldata metadataURI,
+        NodeMetadata[] calldata taskMetadata
+    ) external payable {
+        require(bytes(title).length > 0 && bytes(title).length <= 120, "DAGRegistry: bad title");
+        require(bytes(metadataURI).length <= 180, "DAGRegistry: metadata too long");
+        require(taskNodes.length == taskMetadata.length, "DAGRegistry: metadata length mismatch");
+
+        _submitDAG(dagRoot, taskNodes);
+
+        dagMetadata[dagRoot] = DAGMetadata({
+            title: title,
+            metadataURI: metadataURI
+        });
+
+        emit DAGMetadataSubmitted(dagRoot, title, metadataURI);
+
+        for (uint256 i = 0; i < taskNodes.length; i++) {
+            _validateNodeMetadata(taskMetadata[i]);
+            bytes32 taskId = taskNodes[i].taskId;
+            nodeMetadata[taskId] = taskMetadata[i];
+            emit NodeMetadataSubmitted(
+                dagRoot,
+                taskId,
+                taskMetadata[i].label,
+                taskMetadata[i].inputSchemaURI,
+                taskMetadata[i].outputSchemaURI,
+                taskMetadata[i].qualityRubricURI
+            );
+        }
+    }
+
+    function _submitDAG(
+        bytes32          dagRoot,
+        TaskNode[] calldata taskNodes
+    ) internal {
+        require(dagRoot != bytes32(0), "DAGRegistry: zero dagRoot");
         require(dags[dagRoot].requester == address(0), "DAGRegistry: DAG already exists");
         require(taskNodes.length > 0,                  "DAGRegistry: empty DAG");
 
@@ -159,12 +230,16 @@ contract TaskDAGRegistry {
         uint256[] memory budgets = new uint256[](taskNodes.length);
 
         for (uint256 i = 0; i < taskNodes.length; i++) {
+            require(taskNodes[i].taskId != bytes32(0), "DAGRegistry: zero taskId");
+            require(nodeToDag[taskNodes[i].taskId] == bytes32(0), "DAGRegistry: duplicate taskId");
+            require(taskNodes[i].maxBudget > 0, "DAGRegistry: zero budget");
+            require(taskNodes[i].timeoutBlocks > 0, "DAGRegistry: zero timeout");
             total      += taskNodes[i].maxBudget;
             taskIds[i]  = taskNodes[i].taskId;
             budgets[i]  = taskNodes[i].maxBudget;
         }
 
-        require(msg.value >= total, "DAGRegistry: insufficient budget");
+        require(msg.value == total, "DAGRegistry: budget mismatch");
 
         // Store DAG metadata
         dags[dagRoot] = DAG({
@@ -178,9 +253,21 @@ contract TaskDAGRegistry {
 
         // Store nodes
         for (uint256 i = 0; i < taskNodes.length; i++) {
-            nodes[taskNodes[i].taskId]        = taskNodes[i];
-            nodes[taskNodes[i].taskId].status = NodeStatus.BIDDING;
+            bytes32 taskId = taskNodes[i].taskId;
+            nodes[taskId] = taskNodes[i];
+            if (taskNodes[i].dependsOn.length == 0) {
+                if (taskNodes[i].assignedAgent != address(0)) {
+                    nodes[taskId].status     = NodeStatus.ASSIGNED;
+                    nodes[taskId].assignedAt = block.number;
+                } else {
+                    nodes[taskId].status = NodeStatus.BIDDING;
+                }
+            } else {
+                nodes[taskId].status = NodeStatus.PENDING;
+            }
+            nodeToDag[taskId] = dagRoot;
             dagNodes[dagRoot].push(taskNodes[i].taskId);
+            emit NodeStatusChanged(taskId, nodes[taskId].status, nodes[taskId].assignedAgent);
         }
 
         // Lock funds in escrow
@@ -189,6 +276,13 @@ contract TaskDAGRegistry {
         );
 
         emit DAGSubmitted(dagRoot, msg.sender, taskNodes.length, msg.value);
+    }
+
+    function _validateNodeMetadata(NodeMetadata calldata metadata) internal pure {
+        require(bytes(metadata.label).length > 0 && bytes(metadata.label).length <= 80, "DAGRegistry: bad label");
+        require(bytes(metadata.inputSchemaURI).length <= 180, "DAGRegistry: input URI too long");
+        require(bytes(metadata.outputSchemaURI).length <= 180, "DAGRegistry: output URI too long");
+        require(bytes(metadata.qualityRubricURI).length <= 180, "DAGRegistry: rubric URI too long");
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -207,7 +301,12 @@ contract TaskDAGRegistry {
 
     /// @notice Called by BidEngine when no bid awarded (fail)
     function markNodeFailed(bytes32 taskId) external onlyBidEngine {
-        nodes[taskId].status = NodeStatus.FAILED;
+        TaskNode storage n = nodes[taskId];
+        require(
+            n.status == NodeStatus.BIDDING || n.status == NodeStatus.PENDING,
+            "DAGRegistry: node not fail-ready"
+        );
+        n.status = NodeStatus.FAILED;
         emit NodeStatusChanged(taskId, NodeStatus.FAILED, address(0));
         IMeshEscrow(meshEscrow).refundOnTimeout(taskId);
     }
@@ -215,9 +314,29 @@ contract TaskDAGRegistry {
     /// @notice Called by TEEVerifierBridge when work passes verification
     function markNodeComplete(bytes32 taskId) external onlyTEE {
         TaskNode storage n = nodes[taskId];
+        require(
+            n.status == NodeStatus.ASSIGNED || n.status == NodeStatus.RUNNING,
+            "DAGRegistry: node not active"
+        );
         n.status      = NodeStatus.COMPLETE;
         n.completedAt = block.number;
         emit NodeStatusChanged(taskId, NodeStatus.COMPLETE, n.assignedAgent);
+
+        bytes32 dagRoot = nodeToDag[taskId];
+        _openReadyDependents(dagRoot);
+        _maybeMarkDAGComplete(dagRoot);
+    }
+
+    /// @notice Called by TEEVerifierBridge when verification fails
+    function markNodeFailedByTEE(bytes32 taskId) external onlyTEE {
+        TaskNode storage n = nodes[taskId];
+        require(
+            n.status == NodeStatus.ASSIGNED || n.status == NodeStatus.RUNNING,
+            "DAGRegistry: node not active"
+        );
+        n.status = NodeStatus.FAILED;
+        emit NodeStatusChanged(taskId, NodeStatus.FAILED, n.assignedAgent);
+        IMeshEscrow(meshEscrow).refundOnTimeout(taskId);
     }
 
     /// @notice Anyone can trigger a timeout refund if timeoutBlocks has passed
@@ -255,6 +374,35 @@ contract TaskDAGRegistry {
         }
     }
 
+    function _openReadyDependents(bytes32 dagRoot) internal {
+        bytes32[] storage ids = dagNodes[dagRoot];
+        for (uint256 i = 0; i < ids.length; i++) {
+            TaskNode storage n = nodes[ids[i]];
+            if (n.status == NodeStatus.PENDING && dependenciesMet(ids[i])) {
+                if (n.assignedAgent != address(0)) {
+                    n.status     = NodeStatus.ASSIGNED;
+                    n.assignedAt = block.number;
+                } else {
+                    n.status = NodeStatus.BIDDING;
+                }
+                emit NodeStatusChanged(ids[i], n.status, n.assignedAgent);
+            }
+        }
+    }
+
+    function _maybeMarkDAGComplete(bytes32 dagRoot) internal {
+        DAG storage d = dags[dagRoot];
+        if (d.complete) return;
+
+        bytes32[] storage ids = dagNodes[dagRoot];
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (nodes[ids[i]].status != NodeStatus.COMPLETE) return;
+        }
+
+        d.complete = true;
+        emit DAGCompleted(dagRoot);
+    }
+
     // ─────────────────────────────────────────────────────────────
     //  Views
     // ─────────────────────────────────────────────────────────────
@@ -275,7 +423,11 @@ contract TaskDAGRegistry {
         return nodes[taskId].status;
     }
 
-    function dependenciesMet(bytes32 taskId) external view returns (bool) {
+    function getAssignedAgent(bytes32 taskId) external view returns (address) {
+        return nodes[taskId].assignedAgent;
+    }
+
+    function dependenciesMet(bytes32 taskId) public view returns (bool) {
         bytes32[] memory deps = nodes[taskId].dependsOn;
         for (uint256 i = 0; i < deps.length; i++) {
             if (nodes[deps[i]].status != NodeStatus.COMPLETE) return false;

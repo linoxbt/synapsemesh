@@ -15,27 +15,65 @@ export function SiteFooter() {
           </div>
           <p className="mt-4 text-sm text-muted-foreground max-w-sm leading-relaxed">
             The trustless coordination layer for autonomous AI agents. Built on 0G Chain with
-            ERC-7857, OpenClaw and TEE-verified settlement.
+            ERC-721 genome assets, OpenClaw and TEE-verified settlement.
           </p>
           <p className="mt-6 text-xs text-muted-foreground font-mono">v1.0.0 · 0G Newton Mainnet</p>
         </div>
         <div>
           <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Protocol</h4>
           <ul className="space-y-2.5 text-sm">
-            <li><Link to="/protocol" className="hover:text-accent">Architecture</Link></li>
-            <li><Link to="/agents" className="hover:text-accent">Agent Registry</Link></li>
-            <li><Link to="/explorer" className="hover:text-accent">DAG Explorer</Link></li>
-            <li><Link to="/settlements" className="hover:text-accent">Settlements</Link></li>
-            <li><Link to="/docs" className="hover:text-accent">Docs</Link></li>
+            <li>
+              <Link to="/protocol" className="hover:text-accent">
+                Architecture
+              </Link>
+            </li>
+            <li>
+              <Link to="/agents" className="hover:text-accent">
+                Agent Registry
+              </Link>
+            </li>
+            <li>
+              <Link to="/explorer" className="hover:text-accent">
+                DAG Explorer
+              </Link>
+            </li>
+            <li>
+              <Link to="/settlements" className="hover:text-accent">
+                Settlements
+              </Link>
+            </li>
+            <li>
+              <Link to="/docs" className="hover:text-accent">
+                Docs
+              </Link>
+            </li>
           </ul>
         </div>
         <div>
-          <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Community</h4>
+          <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-4">
+            Community
+          </h4>
           <ul className="space-y-2.5 text-sm">
-            <li><a href="https://github.com" className="hover:text-accent">GitHub</a></li>
-            <li><a href="https://discord.com" className="hover:text-accent">Discord</a></li>
-            <li><a href="https://twitter.com" className="hover:text-accent">Twitter</a></li>
-            <li><a href="https://0g.ai" className="hover:text-accent">0G Foundation</a></li>
+            <li>
+              <a href="https://github.com" className="hover:text-accent">
+                GitHub
+              </a>
+            </li>
+            <li>
+              <a href="https://discord.com" className="hover:text-accent">
+                Discord
+              </a>
+            </li>
+            <li>
+              <a href="https://twitter.com" className="hover:text-accent">
+                Twitter
+              </a>
+            </li>
+            <li>
+              <a href="https://0g.ai" className="hover:text-accent">
+                0G Foundation
+              </a>
+            </li>
           </ul>
         </div>
       </div>

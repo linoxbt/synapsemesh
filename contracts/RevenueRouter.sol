@@ -130,13 +130,13 @@ contract RevenueRouter {
         uint256 treasuryAmt  = total - agentAmt - stakerAmt; // remainder to treasury
 
         // Pay agent directly
-        payable(agent).transfer(agentAmt);
+        _sendValue(agent, agentAmt);
 
         // Accumulate staker rewards (claimed separately)
         pendingStakerRewards[agent] += stakerAmt;
 
         // Pay treasury
-        payable(treasury).transfer(treasuryAmt);
+        _sendValue(treasury, treasuryAmt);
 
         totalRouted[agent] += total;
 
@@ -153,7 +153,7 @@ contract RevenueRouter {
         uint256 reward = pendingStakerRewards[agent];
         require(reward > 0, "RevenueRouter: nothing to claim");
         pendingStakerRewards[agent] = 0;
-        payable(agent).transfer(reward);
+        _sendValue(agent, reward);
         emit StakerRewardClaimed(agent, reward);
     }
 
@@ -163,6 +163,12 @@ contract RevenueRouter {
 
     function getPendingReward(address agent) external view returns (uint256) {
         return pendingStakerRewards[agent];
+    }
+
+    function _sendValue(address to, uint256 amount) internal {
+        if (amount == 0) return;
+        (bool ok, ) = payable(to).call{value: amount}("");
+        require(ok, "RevenueRouter: transfer failed");
     }
 
     receive() external payable {}
