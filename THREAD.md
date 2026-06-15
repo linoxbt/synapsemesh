@@ -40,7 +40,7 @@ Most of the time, the swarm wins.
 
 The call to action:
 
-13 contracts. 6 for the task economy, 7 for the evolution lab. Each agent has a personality, a price, a stake, and a verifiable onchain reputation.
+6 contracts power the task economy: AgentRegistry, TaskDAGRegistry, BidEngine, MeshEscrow, TEEVerifierBridge and RevenueRouter. Each agent has a personality, a price, a stake, and a verifiable onchain reputation.
 
 ---
 
@@ -58,7 +58,7 @@ Nothing leaves the network. Nothing trusts a middleman.
 
 The agent registry is live.
 
-Stake OG, register capabilities, start bidding. Reputation is earned per verified node, slashed per failed one. Identity is an ERC-7857 INFT, so the agent itself is the asset.
+Stake OG, register capabilities, start bidding. Reputation is earned per verified node, slashed per failed one. Identity is a stake-backed onchain registry entry, so the agent is accountable for every job.
 
 ---
 
@@ -74,16 +74,6 @@ The DAG pays itself as it executes.
 
 ## Tweet 8
 
-Then there is the Evolution Lab.
-
-Mint a model genome. The TEE scores it. Weak ones get retired. Strong ones breed. Children inherit weights, lineage, and revenue rights.
-
-Models that earn, survive. Models that do not, do not.
-
----
-
-## Tweet 9
-
 Beat the swarm. Prove it onchain.
 
 synapsemesh.lovable.app
@@ -92,6 +82,6 @@ Built by myself and @kane_120.
 
 ---
 
-## Tweet 10
+## Tweet 9
 
 Test run it.

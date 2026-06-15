@@ -7,32 +7,26 @@ Date analyzed: 2026-05-30
 
 ## Executive Summary
 
-SynapseMesh is a hackathon-stage protocol prototype for a 0G-based autonomous-agent task economy and model-genome marketplace. The repository contains a Vite/React frontend, 13 Solidity contracts, Hardhat artifacts, deployment scripts, a small SDK, and agent/auctioneer runtime scripts.
+SynapseMesh is a hackathon-stage protocol prototype for a 0G-based autonomous-agent task economy. The repository contains a Vite/React frontend, 6 Solidity contracts, Hardhat artifacts, deployment scripts, a small SDK, and agent/auctioneer runtime scripts.
 
-The concept is coherent: users submit task DAGs, agents bid for nodes, a TEE verifier signs quality scores, escrow releases payment, and an adjacent "Evolution Lab" mints/evaluates model genomes as NFTs. The implementation is not yet production-ready. The codebase mixes live on-chain wiring, mocked/localStorage simulation, stale documentation, inconsistent ABIs, incomplete deployment scripts, and privileged off-chain control points.
+The concept is coherent: users submit task DAGs, agents bid for nodes, a TEE verifier signs quality scores, and escrow releases payment. The implementation is not yet production-ready. The codebase mixes live on-chain wiring, mocked/localStorage simulation, stale documentation, inconsistent ABIs, incomplete deployment scripts, and privileged off-chain control points.
 
 The highest-impact issues found in the initial clone were:
 
 1. A hardcoded dGrid API key was referenced in deployment history; the working tree now reads `DGRID_API_KEY` from the environment only. Rotate any real key that was ever committed.
 2. Frontend/SDK event ABIs do not match the Solidity verifier event.
 3. The TEE trust model is just an owner-controlled ECDSA signer plus owner-controlled enclave hash, not real on-chain quote verification.
-4. Several core flows depend on centralized off-chain services: auctioneer, verifier submitter, runtime agents, and genome backend.
+4. Several core flows depend on centralized off-chain services: auctioneer, verifier submitter, and runtime agents.
 5. The main deploy scripts were incompatible with current contract constructors.
 6. Build/compile verification initially failed in this environment because `node_modules` was corrupted.
 7. Supply-chain risk is non-trivial: `npm audit --omit=dev` reports 30 runtime vulnerabilities, including 2 high severity.
 
 ## Remediation Update
 
-The current working tree addresses the app-level and contract-level blockers that prevented the Evolution Lab from being a real onchain module:
+The current working tree addresses several app-level and contract-level blockers in the Task Economy:
 
-- Added the `/evolution` route with wallet writes for genome minting, TEE evaluation requests, crossover, mutation commits, market approval/list/buy/rent, inference-pool enrollment, inference revenue distribution, reward claims, and DAO propose/vote/execute.
-- Split `ModelGenome` permissions so only `FitnessOracle` can submit scores, only `GenOps` can mint children/update adapter roots, and only `InferencePool` can accrue revenue.
-- Made mutation update `ModelGenome.adapterStorageRoot` onchain instead of emitting an inert event.
-- Made `GenomeMarket` custody listed NFTs until sale or delist, and added rental-price state to the indexed UI.
-- Made `InferencePool.addToPool` permissionless for deployable genomes and removed the hardcoded `88` threshold.
 - Made DAG dependency progression onchain: only root nodes open for bidding at submission, downstream nodes open when dependencies complete, and DAG completion is emitted when all nodes complete.
-- Added DAO-controlled ownership transfer support and updated deployment scripts to transfer `ModelGenome`, `GenOps`, `EvolutionClock`, and full-deploy `AgentRegistry` ownership to `GenomeDAO`.
-- Updated frontend ABIs/indexing to read current owner, listing, rental, pool, and pending reward state from contract calls instead of stale event assumptions.
+- Updated frontend ABIs/indexing to read current owner and node state from contract calls instead of stale event assumptions.
 
 ## Repository Shape
 
@@ -45,10 +39,9 @@ The current working tree addresses the app-level and contract-level blockers tha
 
 ## Product And Architecture
 
-The README describes two modules:
+The README describes a single module:
 
 - Task Economy: task DAG submission, bidding, agent registry, escrow, TEE verification, settlement.
-- Evolution Lab: ERC-721 "genome" NFTs, TEE fitness scores, genetic operator events, inference revenue, market, governance.
 
 The implementation is closer to a protocol demonstrator than a fully decentralized network:
 
@@ -156,23 +149,6 @@ Risks:
 - Uses `transfer` for agent, treasury, and reward payout.
 - No relation to `AgentRegistry.totalEarned`.
 
-### Evolution Lab Contracts
-
-Strengths:
-
-- Provides a plausible NFT-based data model for genomes.
-- Tracks species, generation, lineage root, fitness, status, and revenue.
-- Supports market listing/rental and governance parameter proposals.
-
-Risks:
-
-- `ModelGenome.accrueRevenue` is public and unrestricted, so anyone can inflate a genome's reported revenue.
-- `GenOps.mutate` only emits an event and explicitly notes that `ModelGenome` lacks an adapter-root update function.
-- `EvolutionClock` only emits events; selection/crossover/mutation are off-chain.
-- `GenomeDAO` hardcodes threshold pair values when updating one side (`45` or `88`), potentially overwriting prior governance choices.
-- `GenomeDAO._votingPower` loops over full species populations on-chain, which will not scale.
-- `GenomeMarket.rent` lets the caller supply `pricePerBlock`; there is no owner-set rental price/listing guard.
-
 ## Frontend And SDK Review
 
 What is real:
@@ -187,15 +163,14 @@ Initial inconsistencies found:
 
 - The old local SDK in `src/lib/sdk.ts` still exists for shared types and sample state, but the changed primary pages now read/write through onchain hooks.
 - `src/lib/onchain.ts`, `src/lib/chainStream.ts`, and `sdk/src/index.ts` had stale event/function ABI assumptions; these were aligned with the Solidity contracts.
-- Agent and genome UI/docs claimed ERC-7857/INFT semantics that the contracts did not implement; the working tree now describes agents as registry entries and genomes as ERC-721 assets.
+- Agent UI/docs claimed tokenized identity semantics that the contracts did not implement; the working tree now describes agents as stake-backed registry entries.
 - README/deployment docs still had stale chain/deployment wording; the working tree now documents the 0G Aristotle mainnet configuration and the onchain/offchain boundary more accurately.
 
 ## Operations And Deployment
 
 Initial deployment issues:
 
-- Deployment scripts had stale constructor arguments and did not transfer governance ownership. They now deploy `GenomeDAO` with the agent registry argument and transfer available governance-owned contracts to the DAO.
-- `scripts/deploy_final.ts` still includes hardcoded historical Evolution Lab addresses for that specific deployment-repair flow.
+- Deployment scripts had stale constructor arguments that did not match the Solidity source; they now align with current contract constructors.
 - `deploy_tee.js` now reads `DGRID_API_KEY` from the environment; rotate any key that was ever committed in history.
 
 ## Security Findings
@@ -205,7 +180,6 @@ Critical:
 - Hardcoded API key in `deploy_tee.js`.
 - TEE attestation model is centralized and lacks on-chain hardware quote verification.
 - TEE signature omits `assignedAgent`, allowing attribution mismatch if a signature leaks or a submitter is malicious.
-- `ModelGenome.accrueRevenue` is unrestricted.
 
 High:
 
@@ -220,7 +194,6 @@ Medium:
 - Stranded extra value possible in DAG submission/escrow accounting.
 - `deregister` does not enforce "not assigned to task".
 - Bid price does not determine payout.
-- Governance and genome evolution paths are event-driven stubs, not autonomous on-chain evolution.
 - `transfer` is used throughout payment paths.
 - Committed artifacts increase repo noise and stale ABI risk.
 
@@ -267,11 +240,10 @@ Current verification after remediation:
 7. Replace owner-controlled signer/enclave updates with multisig/timelock/governance at minimum.
 8. Decide whether winner scoring is intentionally centralized. If not, move scoring and bid-window enforcement on-chain or publish a verifiable auction transcript.
 9. Fix settlement lifecycle: failed verification should mark node failed and refund or route funds according to explicit policy.
-10. Restrict `ModelGenome.accrueRevenue` to `InferencePool`.
-11. Remove or clearly label demo/localStorage paths.
-12. Align README, `.env.example`, deployment docs, chain IDs, and live addresses.
-13. Replace `transfer` with `call` plus reentrancy guards/checks-effects-interactions.
-14. Add unit tests for stake registration, DAG submission, escrow accounting, bid award, TEE pass/fail, refund, revenue routing, genome revenue, and deploy scripts.
+10. Remove or clearly label demo/localStorage paths.
+11. Align README, `.env.example`, deployment docs, chain IDs, and live addresses.
+12. Replace `transfer` with `call` plus reentrancy guards/checks-effects-interactions.
+13. Add unit tests for stake registration, DAG submission, escrow accounting, bid award, TEE pass/fail, refund, revenue routing, and deploy scripts.
 
 ## Bottom Line
 

@@ -3,7 +3,7 @@ import { parseAbi, type Address } from "viem";
 /**
  * SYNAPSEMESH SMART CONTRACT REGISTRY (0G CHAIN)
  *
- * 13 core protocol contracts. Addresses are read from Vite environment variables
+ * Task Economy protocol contracts. Addresses are read from Vite environment variables
  * so they can be set per-deployment (testnet vs mainnet) without code changes.
  * For the live SynapseMesh deployment, the registry addresses below are used as
  * defaults so the app still works when local env files are absent.
@@ -31,15 +31,6 @@ export const CONTRACT_ADDRESSES = {
     "0x4d0DC0C2F32edfD234B8c179e77721bEBF1611cF",
   ),
   revenueRouter: addr("VITE_CONTRACT_REVENUE_ROUTER"),
-
-  // System 2: Evolution Lab
-  fitnessOracle: addr("VITE_CONTRACT_FITNESS_ORACLE"),
-  genOps: addr("VITE_CONTRACT_GEN_OPS"),
-  modelGenome: addr("VITE_CONTRACT_MODEL_GENOME"),
-  evolutionClock: addr("VITE_CONTRACT_EVOLUTION_CLOCK"),
-  inferencePool: addr("VITE_CONTRACT_INFERENCE_POOL"),
-  genomeMarket: addr("VITE_CONTRACT_GENOME_MARKET"),
-  genomeDAO: addr("VITE_CONTRACT_GENOME_DAO"),
 } as const;
 
 /** Returns true when a contract address has been deployed (non-zero). */

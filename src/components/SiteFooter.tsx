@@ -15,7 +15,7 @@ export function SiteFooter() {
           </div>
           <p className="mt-4 text-sm text-muted-foreground max-w-sm leading-relaxed">
             The trustless coordination layer for autonomous AI agents. Built on 0G Chain with
-            ERC-721 genome assets, OpenClaw and TEE-verified settlement.
+            onchain Task DAGs, OpenClaw and TEE-verified settlement.
           </p>
           <p className="mt-6 text-xs text-muted-foreground font-mono">v1.0.0 · 0G Newton Mainnet</p>
         </div>

@@ -31,17 +31,6 @@ async function main() {
     const teeVerifier = "0x4d0DC0C2F32edfD234B8c179e77721bEBF1611cF";
     const revenueRouter = "0xa1313d218EbA5E0970A86C7140233976892631a5";
 
-    // System 2 addresses (Run 3)
-    const fitnessOracle = "0x8313B473b8C9CaDcb56D4b5843A9BF61f7Beedd5";
-    const genOps = "0x7cB119F6Dd19f1d882ab0F161BE95fC6Eeb38Ceb";
-    const modelGenome = "0x50B7c1301CC7Da2EAd16375301e8977F0c1Ff793";
-    const evoClock = "0xB53F9cE714A679775470147DA1d1BdD3a7b47DDd";
-
-    // System 2 Final addresses (Run 4)
-    const inferencePool = "0x991ff5dDabb0f6B9324f03ad151055D991D64082";
-    const genomeMarket = "0xFc4303b75952530bb9ee9fe8DBE31C052a9b0045";
-    const genomeDAO = "0x6535940F5ac91B0DB3cf9aE0B2efAA096bc973be";
-
     console.log("--- System 1: Task Economy ---");
     await verifyContract("MeshEscrow", meshEscrow, []);
     await verifyContract("AgentRegistry", agentRegistry, [meshEscrow, treasury]);
@@ -49,15 +38,6 @@ async function main() {
     await verifyContract("BidEngine", bidEngine, [agentRegistry, taskDagRegistry, teeSignerAddress]);
     await verifyContract("TEEVerifierBridge", teeVerifier, [meshEscrow, agentRegistry, taskDagRegistry, teeSignerAddress, zeroHash]);
     await verifyContract("RevenueRouter", revenueRouter, [treasury, 8000, 1000, 1000]);
-
-    console.log("\n--- System 2: Evolution Lab ---");
-    await verifyContract("FitnessOracle", fitnessOracle, [teeSignerAddress, zeroHash]);
-    await verifyContract("GenOps", genOps, [evoClock, treasury, hre.ethers.parseEther("1"), 500]);
-    await verifyContract("ModelGenome", modelGenome, [fitnessOracle, genOps, treasury]);
-    await verifyContract("EvolutionClock", evoClock, [genOps, 100]);
-    await verifyContract("InferencePool", inferencePool, [modelGenome, treasury, 1000]);
-    await verifyContract("GenomeMarket", genomeMarket, [modelGenome, treasury, 250]);
-    await verifyContract("GenomeDAO", genomeDAO, [modelGenome, evoClock, genOps, 1000, 3]);
 
     console.log("\nVerification Process Completed!");
 }

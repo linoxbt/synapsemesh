@@ -127,9 +127,8 @@ Search and replace all of the following:
 
 ---
 
-## 6. The 13 Contracts (Split by Docs Module)
+## 6. The 6 Task Economy Contracts
 
-### Task Economy (6 contracts)
 | # | Name | `contracts.ts` key | Status |
 |---|---|---|---|
 | 1 | AgentRegistry.sol | `meshRegistry` | Not deployed |
@@ -138,17 +137,6 @@ Search and replace all of the following:
 | 4 | MeshEscrow.sol | `meshEscrow` | Not deployed |
 | 5 | TEEVerifierBridge.sol | `teeVerifier` | Not deployed |
 | 6 | RevenueRouter.sol | `meshIncentives`* | Not deployed |
-
-### Evolution Lab (7 contracts)
-| # | Name | `contracts.ts` key | Status |
-|---|---|---|---|
-| 7 | ModelGenome.sol (ERC-7857) | `meshINFT` | Not deployed |
-| 8 | GenOps.sol | `meshFactory` | Not deployed |
-| 9 | FitnessOracle.sol | `meshOracle` | Not deployed |
-| 10 | EvolutionClock.sol | `meshGovernor`* | Not deployed |
-| 11 | InferencePool.sol | `meshStaking`* | Not deployed |
-| 12 | GenomeMarket.sol | `meshBridge`* | Not deployed |
-| 13 | GenomeDAO.sol | `meshTreasury`* | Not deployed |
 
 > *Key mappings in `contracts.ts` need to be renamed to match actual contract names — done during Phase 5.
 

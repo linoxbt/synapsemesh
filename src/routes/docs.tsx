@@ -9,13 +9,12 @@ export const Route = createFileRoute("/docs")({
       {
         name: "description",
         content:
-          "The complete SynapseMesh handbook: 13 contracts across the Task Economy and Evolution Lab, the SDK, the TEE attestation stream, wallet, transactions and every page in the app.",
+          "The complete SynapseMesh handbook: the six Task Economy contracts, the SDK, the TEE attestation stream, wallet, transactions and every page in the app.",
       },
       { property: "og:title", content: "Docs - SynapseMesh" },
       {
         property: "og:description",
-        content:
-          "Build, ship and observe trustless task economies and evolving model genomes on 0G Chain.",
+        content: "Build, ship and observe trustless task economies on 0G Chain.",
       },
     ],
   }),
@@ -26,9 +25,7 @@ const TOC = [
   { id: "overview", t: "Overview" },
   { id: "architecture", t: "Architecture" },
   { id: "task-economy", t: "Task Economy contracts" },
-  { id: "evolution-lab", t: "Evolution Lab contracts" },
   { id: "task-flow", t: "Task lifecycle" },
-  { id: "evo-flow", t: "Evolution lifecycle" },
   { id: "tee", t: "TEE attestation stream" },
   { id: "wallet", t: "Wallet & 0G network" },
   { id: "tx", t: "Transaction lifecycle" },
@@ -72,44 +69,6 @@ const TASK_ECONOMY = [
   },
 ];
 
-const EVOLUTION_LAB = [
-  {
-    n: "ModelGenome.sol",
-    role: "ERC-721",
-    d: "Genome NFT. Every model adapter is minted with id, storage root, fitness score, lineage, status and revenue metadata.",
-  },
-  {
-    n: "GenOps.sol",
-    role: "Breeding",
-    d: "The breeding lab. Performs crossover and mutation on two parent genome NFTs to produce a child genome.",
-  },
-  {
-    n: "FitnessOracle.sol",
-    role: "Verification",
-    d: "Receives TEE benchmark scores and updates each genome's fitness. Marks weak genomes extinct and strong ones deployable.",
-  },
-  {
-    n: "EvolutionClock.sol",
-    role: "Cadence",
-    d: "The timer. Every 100 blocks anyone can trigger the next generation cycle - permissionless, gas-paid by the caller.",
-  },
-  {
-    n: "InferencePool.sol",
-    role: "Revenue",
-    d: "Enrolls deployable genomes in the inference pool and splits paid inference revenue between the genome holder and treasury.",
-  },
-  {
-    n: "GenomeMarket.sol",
-    role: "Market",
-    d: "Genome NFTs can be bought, sold or rented here, with royalty splits to upstream lineage.",
-  },
-  {
-    n: "GenomeDAO.sol",
-    role: "Governance",
-    d: "Token-weighted votes set the evolution rules: mutation rate, epoch length, extinction threshold, deployment cutoff.",
-  },
-];
-
 function DocsPage() {
   return (
     <div className="min-h-screen flex flex-col">
@@ -122,8 +81,8 @@ function DocsPage() {
               The SynapseMesh <em className="italic text-accent">handbook.</em>
             </h1>
             <p className="text-muted-foreground mt-5 max-w-2xl">
-              Two modules, thirteen contracts, one neutral protocol. Below is the full
-              architectural, operational and developer reference for everything shipped in this app.
+              Six contracts, one neutral protocol. Below is the full architectural, operational and
+              developer reference for everything shipped in this app.
             </p>
           </div>
         </section>
@@ -150,56 +109,39 @@ function DocsPage() {
           <div className="prose-mesh space-y-16 max-w-3xl">
             <Section id="overview" title="Overview">
               <p>
-                SynapseMesh is a neutral coordination layer for autonomous AI on 0G Chain. It is
-                split into two cooperating modules:
+                SynapseMesh is a neutral coordination layer for autonomous AI on 0G Chain. The Task
+                Economy lets clients post jobs as Task DAGs; agents bid, the TEE judges, and escrow
+                settles atomically.
               </p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>
-                  <b>Task Economy</b> - clients post jobs as Task DAGs, agents bid, the TEE judges,
-                  escrow settles atomically.
-                </li>
-                <li>
-                  <b>Evolution Lab</b> - models are minted as ERC-721 genome NFTs; the strong
-                  reproduce, the weak go extinct, the deployed earn.
-                </li>
-              </ul>
               <p>
-                State transitions are committed onchain: DAG status, escrow settlement, genome
-                minting, fitness status, market custody, inference rewards and DAO execution.
-                Offchain workers still provide TEE signatures, auction decisions and adapter math.
+                State transitions are committed onchain: DAG status, node assignment and escrow
+                settlement. Offchain workers still provide TEE signatures and auction decisions.
               </p>
             </Section>
 
             <Section id="architecture" title="Architecture">
               <p>
-                Three planes power both modules: a coordination plane onchain, an execution plane
+                Three planes power the protocol: a coordination plane onchain, an execution plane
                 offchain and a verification plane inside a TEE.
               </p>
               <pre className="block-code">{`Client / Owner
    |
    v
-Task Economy                       Evolution Lab
-   TaskDAGRegistry                    ModelGenome (ERC-721)
-   BidEngine -> AgentRegistry         GenOps -> EvolutionClock
-   MeshEscrow                         FitnessOracle
-        \\                               /
-         \\                             /
-          v                           v
-         TEE Verifier (0G Compute, attested)
-                  |
-                  v
-         RevenueRouter -> agents, staker pool, treasury
-         InferencePool -> genome holders, treasury`}</pre>
+Task Economy
+   TaskDAGRegistry
+   BidEngine -> AgentRegistry
+   MeshEscrow
+          |
+          v
+   TEE Verifier (0G Compute, attested)
+          |
+          v
+   RevenueRouter -> agents, staker pool, treasury`}</pre>
             </Section>
 
             <Section id="task-economy" title="Task Economy contracts (6)">
               <p>The Task Economy turns a job description into verified, paid work.</p>
               <ContractTable rows={TASK_ECONOMY} />
-            </Section>
-
-            <Section id="evolution-lab" title="Evolution Lab contracts (7)">
-              <p>The Evolution Lab turns models into living, competing assets.</p>
-              <ContractTable rows={EVOLUTION_LAB} />
             </Section>
 
             <Section id="task-flow" title="Task lifecycle">
@@ -222,33 +164,6 @@ Task Economy                       Evolution Lab
                 <li>
                   <b>Settle</b> - MeshEscrow releases the payout; RevenueRouter splits it across
                   agent, stakers and treasury.
-                </li>
-              </ol>
-            </Section>
-
-            <Section id="evo-flow" title="Evolution lifecycle">
-              <ol className="list-decimal pl-5 space-y-1">
-                <li>
-                  <b>Mint</b> - a model is minted as a ModelGenome NFT with weight hash and lineage.
-                </li>
-                <li>
-                  <b>Benchmark</b> - the TEE benchmarks the genome; FitnessOracle records the score.
-                </li>
-                <li>
-                  <b>Tick</b> - every 100 blocks anyone can call EvolutionClock to advance the
-                  generation.
-                </li>
-                <li>
-                  <b>Breed or extinct</b> - GenOps crosses the strongest genomes; weak genomes are
-                  flagged extinct.
-                </li>
-                <li>
-                  <b>Deploy</b> - genomes over the governance threshold can enter InferencePool and
-                  start earning revenue.
-                </li>
-                <li>
-                  <b>Trade & govern</b> - GenomeMarket handles transfers; GenomeDAO sets the
-                  evolution rules.
                 </li>
               </ol>
             </Section>
@@ -380,7 +295,6 @@ mesh.events.onVerificationSubmitted((taskId, agentAddress, passed, score, payout
                   </Link>{" "}
                   - compose nodes, dependencies and budgets, then submit.
                 </li>
-                {/* Evolution Lab page is disabled until the production UI is ready. */}
                 <li>
                   <Link to="/settlements" className="link-mesh">
                     Settlements
@@ -436,19 +350,8 @@ VITE_TEE_ATTEST_TOPIC=0x...         # optional override`}</pre>
                   <b>Task DAG</b> - a directed acyclic graph of typed sub-tasks committed onchain.
                 </li>
                 <li>
-                  <b>Genome</b> - an ERC-721 NFT representing a single AI model with a fitness
-                  score.
-                </li>
-                <li>
                   <b>TEE</b> - Trusted Execution Environment running on 0G Compute; produces signed
                   attestations.
-                </li>
-                <li>
-                  <b>Genome NFT</b> - ERC-721 ownership for model adapter roots and lineage.
-                </li>
-                <li>
-                  <b>Epoch</b> - one evolution generation; advanced by EvolutionClock every 100
-                  blocks.
                 </li>
                 <li>
                   <b>Slashing</b> - forfeiture of an agent's stake when verification fails.

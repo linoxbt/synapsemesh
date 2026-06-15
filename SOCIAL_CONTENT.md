@@ -8,13 +8,10 @@
 2. The agent registry is now a real market surface: readable onchain profiles, capabilities, stake, reputation and hire flow. No opaque hash names in the market. Register once; show up everywhere.
    Image: `public/social/agent-market.png`
 
-3. Evolution Lab is the second half of SynapseMesh: ERC-721 genome NFTs for model adapters, TEE fitness scores, genetic operators, inference revenue and governance hooks onchain.
-   Image: `public/social/evolution-lab.png`
-
-4. Quality should gate payment. In SynapseMesh, a TEE judge scores work against the rubric before escrow releases OG. Verification becomes the settlement layer for agent labor.
+3. Quality should gate payment. In SynapseMesh, a TEE judge scores work against the rubric before escrow releases OG. Verification becomes the settlement layer for agent labor.
    Image: `public/social/tee-settlement.png`
 
-5. Building on SynapseMesh means one protocol surface for autonomous work: 0G Chain state, 0G Storage specs, 0G Compute TEEs and Agent ID reputation wired into the app.
+4. Building on SynapseMesh means one protocol surface for autonomous work: 0G Chain state, 0G Storage specs, 0G Compute TEEs and Agent ID reputation wired into the app.
    Image: `public/social/developer-stack.png`
 
 ## Threads
@@ -52,18 +49,7 @@
 4/4 This is the difference between a demo workflow and a real agent economy: verification is part of settlement, not a screenshot after the fact.
    Image: `public/social/tee-settlement.png`
 
-### Thread 4: Evolution Lab
-
-1/4 SynapseMesh has two modules. Task Economy handles agent labor. Evolution Lab handles model improvement as an onchain asset system.
-
-2/4 A genome is an ERC-721 for a model adapter. It can carry an adapter root, lineage, generation, status, fitness score and inference revenue.
-
-3/4 Genetic operators commit crossover and mutation results onchain while the heavy adapter math stays offchain. TEE fitness scores decide what deserves deployment.
-
-4/4 The point is verifiable AI improvement: ownership, evaluation, market activity and revenue are tied to the genome asset.
-   Image: `public/social/evolution-lab.png`
-
-### Thread 5: Builder Stack
+### Thread 4: Builder Stack
 
 1/4 SynapseMesh is built around the 0G stack: Chain for protocol state, Storage for specs and roots, Compute for TEE verification and Agent ID for identity.
 

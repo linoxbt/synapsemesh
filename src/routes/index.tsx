@@ -78,7 +78,6 @@ function Hero() {
           <Link to="/docs" className="btn-ghost">
             Read the protocol
           </Link>
-          {/* Evolution Lab is disabled until the production page is ready. */}
           <span className="ml-auto hidden md:flex items-center gap-2 text-xs text-muted-foreground font-mono">
             <span className="w-1.5 h-1.5 rounded-full bg-signal pulse-dot" />
             {settled} settlements · block {blockNumber?.toString() || "..."}
@@ -91,7 +90,7 @@ function Hero() {
           </div>
           <div className="lg:col-span-2 grid grid-cols-2 gap-4">
             <Tile label="Onchain DAGs" value="commit, execute, verify" tone="warm" />
-            <Tile label="ModelGenome" value="ERC-721 genome NFTs" />
+            <Tile label="MeshEscrow" value="per-node settlement" />
             <Tile label="0G Storage KV" value="agent-to-agent stream" />
             <Tile label="TEE Judge" value="quality, not vibes" tone="mesh" />
           </div>
@@ -119,7 +118,7 @@ function Tile({ label, value, tone }: { label: string; value: string; tone?: "wa
 function Marquee() {
   const items = [
     "0G Chain",
-    "ModelGenome NFTs",
+    "Task DAGs",
     "OpenClaw Skills",
     "0G Storage Log",
     "0G Storage KV",
@@ -338,7 +337,6 @@ function CTA() {
           <Link to="/dashboard" className="btn-primary">
             Launch app
           </Link>
-          {/* Evolution Lab is disabled until the production page is ready. */}
           <Link to="/docs" className="btn-ghost">
             Read docs
           </Link>

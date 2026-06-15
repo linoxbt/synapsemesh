@@ -8,7 +8,6 @@ const links = [
   { to: "/explorer", label: "Explorer" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/dags/new", label: "Submit DAG" },
-  // Evolution Lab is intentionally disabled until the full page is production-ready.
   { to: "/settlements", label: "Settlements" },
   { to: "/docs", label: "Docs" },
 ] as const;
